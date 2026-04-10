@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal Gerencial — Diners Club BLU 2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600;6..12,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="bg"><div class="bg-grid"></div></div>
+
+<!-- ══════════════ PANTALLA LOGIN ══════════════ -->
+<div class="screen active" id="screen-login">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">
+        <svg height="40" viewBox="0 0 209 182" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M143.877,90.429 C143.841,68.075 129.865,49.007 110.18,41.451 L110.18,139.398 C129.865,131.84 143.841,112.791 143.877,90.429 Z M72.613,139.379 L72.613,41.46 C52.941,49.034 38.988,68.075 38.935,90.429 C38.988,112.773 52.941,131.805 72.613,139.379 Z M91.405,7.641 C45.687,7.658 8.649,44.71 8.636,90.429 C8.649,136.138 45.687,173.181 91.405,173.199 C137.124,173.181 174.176,136.138 174.189,90.429 C174.176,44.71 137.124,7.658 91.405,7.641 Z M91.202,181 C41.173,181.242 0,140.716 0,91.367 C0,37.443 41.173,0.157 91.202,0.165 L114.648,0.165 C164.082,0.157 209.205,37.434 209.205,91.367 C209.205,140.698 164.082,181 114.648,181 L91.202,181 Z" fill="white"/>
+</svg>
+      </div>
+      <div class="auth-title">Portal Gerencial</div>
+      <div class="auth-subtitle">Acceso restringido · Personal autorizado · BLU 2.0</div>
+    </div>
+    <div class="auth-body">
+      <div class="form-group">
+        <label class="form-label">Correo institucional</label>
+        <input type="email" id="l-email" class="form-input" placeholder="gerente@dinersclub.com.ec" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contraseña</label>
+        <input type="password" id="l-pass" class="form-input" placeholder="••••••••" autocomplete="current-password">
+        <div class="error-msg" id="l-err">Credenciales incorrectas. Verifica tus datos.</div>
+      </div>
+      <button class="btn-primary" id="btn-login" onclick="doLogin()">Ingresar al portal</button>
+    </div>
+    <div class="auth-footer">Conexión local segura · Autenticación de dos factores habilitada</div>
+  </div>
+</div>
+
+<!-- ══════════════ PANTALLA OTP ══════════════ -->
+<div class="screen" id="screen-otp">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">
+        <svg height="40" viewBox="0 0 209 182" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M143.877,90.429 C143.841,68.075 129.865,49.007 110.18,41.451 L110.18,139.398 C129.865,131.84 143.841,112.791 143.877,90.429 Z M72.613,139.379 L72.613,41.46 C52.941,49.034 38.988,68.075 38.935,90.429 C38.988,112.773 52.941,131.805 72.613,139.379 Z M91.405,7.641 C45.687,7.658 8.649,44.71 8.636,90.429 C8.649,136.138 45.687,173.181 91.405,173.199 C137.124,173.181 174.176,136.138 174.189,90.429 C174.176,44.71 137.124,7.658 91.405,7.641 Z M91.202,181 C41.173,181.242 0,140.716 0,91.367 C0,37.443 41.173,0.157 91.202,0.165 L114.648,0.165 C164.082,0.157 209.205,37.434 209.205,91.367 C209.205,140.698 164.082,181 114.648,181 L91.202,181 Z" fill="white"/>
+</svg>
+      </div>
+      <div class="auth-title">Verificación de identidad</div>
+      <div class="auth-subtitle">Segundo factor de autenticación</div>
+    </div>
+    <div class="auth-body">
+      <p class="otp-info">Código enviado a<br><span class="otp-em" id="otp-email-show">—</span></p>
+      <div class="otp-wrap">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="o0">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="o1">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="o2">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="o3">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="o4">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="o5">
+      </div>
+      <div class="error-msg" id="otp-err" style="text-align:center;margin-bottom:8px">Código incorrecto o expirado</div>
+      <div class="otp-timer">Expira en <span id="otp-cd">5:00</span></div>
+      <br>
+      <button class="btn-primary" id="btn-verify" onclick="doVerify()">Verificar código</button>
+      <br><br>
+      <div style="text-align:center;font-size:11px;color:var(--muted)">
+        ¿No recibiste el código? &nbsp;<button class="link-btn" onclick="doResend()">Reenviar</button>
+        &nbsp;·&nbsp;<button class="link-btn" onclick="goLogin()">Volver</button>
+      </div>
+    </div>
+    <div class="auth-footer">Por seguridad el código expira en 5 minutos</div>
+  </div>
+</div>
+
+<!-- ══════════════ DASHBOARD ══════════════ -->
+<div class="screen" id="screen-dashboard">
+<div class="dash">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sb-logo">
+    <img src="logo-diners.svg" alt="Diners Club" style="height:20px;width:auto;opacity:0.92">
+  </div>
+  <div class="sb-nav">
+    <div class="sb-sec">Análisis</div>
+    <div class="nav-item active" onclick="showView('resumen')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Resumen ejecutivo
+    </div>
+    <div class="nav-item" onclick="showView('categorias')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+      Por categoría
+    </div>
+    <div class="nav-item" onclick="showView('iniciativas')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Por iniciativa
+    </div>
+    <div class="nav-item" onclick="showView('personas')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Por persona
+    </div>
+    <div class="nav-item" onclick="showView('avance')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Avance y delivery
+    </div>
+    <div class="nav-item" onclick="showView('empresas')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Por empresa
+    </div>
+    <div class="sb-sec" id="sb-admin-sec" style="display:none">Admin</div>
+    <div class="nav-item" id="nav-usuarios" onclick="showView('usuarios')" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Gestión de usuarios
+    </div>
+    <div class="nav-item" id="nav-equipo" onclick="showView('equipo')" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M19 8a3 3 0 0 1 0 6"/><path d="M22 18c0-2.5-1.3-4.4-3-5.5"/></svg>
+      Equipo
+    </div>
+    <div class="nav-item" id="nav-tarifas" onclick="showView('tarifas')" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      Tarifas
+    </div>
+    <div class="nav-item" id="nav-cargar" onclick="showView('cargar')" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Cargar CSV
+    </div>
+    <div class="nav-item" id="nav-historial" onclick="showView('historial')" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Historial de cargas
+    </div>
+    <div class="nav-item" id="nav-logs" onclick="showView('logs')" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Log de accesos
+    </div>
+  </div>
+  <div class="sb-user">
+    <div class="sb-uinfo">
+      <div class="sb-avatar" id="sb-av">—</div>
+      <div><div class="sb-uname" id="sb-nm">—</div><div class="sb-urole" id="sb-rl">—</div></div>
+    </div>
+    <button class="btn-logout" onclick="doLogout()">Cerrar sesión</button>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="main" id="main-content">
+
+<!-- FILTROS GLOBALES -->
+<div id="filter-zone" style="margin-bottom:1.5rem;display:none">
+  <div class="filter-bar">
+    <select class="filter-sel" id="f-anio" onchange="applyFilters()"><option value="">Todos los años</option></select>
+    <select class="filter-sel" id="f-mes" onchange="applyFilters()"><option value="">Todos los meses</option></select>
+    <select class="filter-sel" id="f-empresa" onchange="applyFilters()"><option value="">Todas las empresas</option></select>
+    <select class="filter-sel" id="f-cat" onchange="applyFilters()"><option value="">Todas las categorías</option></select>
+    <select class="filter-sel" id="f-ini" onchange="applyFilters()"><option value="">Todas las iniciativas</option></select>
+    <button class="btn-clear" onclick="clearFilters()">✕ Limpiar</button>
+  </div>
+</div>
+
+<!-- ── VIEW: RESUMEN ── -->
+<div class="view active" id="view-resumen">
+  <div class="topbar">
+    <div><div class="page-title">Resumen ejecutivo</div><div class="page-sub" id="resumen-sub">Cargando datos…</div></div>
+  </div>
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Horas totales</div><div class="kpi-val" id="kpi-h">—</div><div class="kpi-sub">Tasks cerradas</div></div>
+    <div class="kpi" id="kpi-costo-card"><div class="kpi-label">Costo total</div><div class="kpi-val" id="kpi-c">—</div><div class="kpi-sub">USD estimado</div></div>
+    <div class="kpi"><div class="kpi-label">Iniciativas</div><div class="kpi-val" id="kpi-i">—</div><div class="kpi-sub">Con horas registradas</div></div>
+    <div class="kpi"><div class="kpi-label">Personas</div><div class="kpi-val" id="kpi-p">—</div><div class="kpi-sub">Colaboradores activos</div></div>
+  </div>
+  <div class="row row-3-1">
+    <div class="panel">
+      <div class="panel-hdr"><div class="panel-title">Horas por mes</div><div style="display:flex;align-items:center;gap:6px"><div class="panel-badge" id="badge-mes-range">—</div><span class="info-btn" onmouseenter="showTooltip('horas-mes',this)" onmouseleave="hideTooltip()">i</span></div></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="chart-mes"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hdr"><div class="panel-title">Por empresa</div><span class="info-btn" onmouseenter="showTooltip('empresa-donut',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-body"><div class="chart-wrap-sm"><canvas id="chart-emp-donut"></canvas></div>
+      <div id="emp-legend" style="margin-top:8px"></div></div>
+    </div>
+  </div>
+  <div class="row row-2">
+    <div class="panel">
+      <div class="panel-hdr"><div class="panel-title">Top iniciativas</div><div style="display:flex;align-items:center;gap:6px"><div class="panel-badge" onclick="showView('iniciativas')" style="cursor:pointer">Ver todas →</div><span class="info-btn" onmouseenter="showTooltip('top-ini',this)" onmouseleave="hideTooltip()">i</span></div></div>
+      <div class="panel-body" id="pbar-iniciativas"><div class="loader">Cargando…</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hdr"><div class="panel-title">Horas por rol</div><span class="info-btn" onmouseenter="showTooltip('horas-rol',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-body" id="pbar-roles"><div class="loader">Cargando…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW: INICIATIVAS ── -->
+<div class="view" id="view-iniciativas">
+  <div class="topbar">
+    <div><div class="page-title" id="ini-title">Por iniciativa</div><div class="page-sub" id="ini-sub">Haz clic en una iniciativa para ver el detalle por Epics y Tasks</div></div>
+  </div>
+  <div id="ini-breadcrumb" style="display:none"></div>
+  <div id="ini-content"><div class="loader">Cargando…</div></div>
+</div>
+
+<!-- ── VIEW: EMPRESAS ── -->
+<div class="view" id="view-empresas">
+  <div class="topbar"><div><div class="page-title">Por empresa</div><div class="page-sub">Composición y esfuerzo por proveedor</div></div></div>
+  <div class="row row-2">
+    <div class="panel">
+      <div class="panel-hdr"><div class="panel-title">Horas por empresa</div><span class="info-btn" onmouseenter="showTooltip('horas-emp-bar',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="chart-emp-bar"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hdr"><div class="panel-title">Matriz empresa × rol</div><div style="display:flex;align-items:center;gap:6px"><div class="panel-badge">Horas</div><span class="info-btn" onmouseenter="showTooltip('matriz-emp-rol',this)" onmouseleave="hideTooltip()">i</span></div></div>
+      <div class="panel-body heatmap" id="heatmap-content"><div class="loader">Cargando…</div></div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-hdr"><div class="panel-title">Detalle por empresa</div><span class="info-btn" onmouseenter="showTooltip('detalle-emp',this)" onmouseleave="hideTooltip()">i</span></div>
+    <div class="panel-body"><div id="emp-table-wrap"><div class="loader">Cargando…</div></div></div>
+  </div>
+</div>
+
+<!-- ── VIEW: PERSONAS ── -->
+<div class="view" id="view-personas">
+  <div class="topbar"><div><div class="page-title">Por persona</div><div class="page-sub" id="personas-sub">Cargando…</div></div></div>
+  <div class="panel">
+    <div class="panel-hdr">
+      <div style="display:flex;align-items:center"><div class="panel-title">Equipo completo</div><span class="info-btn" onmouseenter="showTooltip('equipo',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="search-wrap">
+        <input type="text" id="persona-search" class="search-input" placeholder="Buscar nombre, empresa o rol…" oninput="filterPersonas()">
+        <span class="search-count" id="personas-count"></span>
+      </div>
+    </div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl" id="personas-table">
+        <thead><tr>
+          <th>Nombre</th><th>Empresa</th><th>Rol</th>
+          <th class="num">Horas</th><th class="num" id="th-costo-per">Costo</th>
+        </tr></thead>
+        <tbody id="personas-tbody"><tr><td colspan="5"><div class="loader">Cargando…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW: CATEGORÍAS ── -->
+<div class="view" id="view-categorias">
+  <div class="topbar"><div><div class="page-title">Por categoría de negocio</div><div class="page-sub">Distribución del esfuerzo por línea de negocio</div></div></div>
+  <div class="row row-2">
+    <div class="panel">
+      <div class="panel-hdr"><div class="panel-title">Horas por categoría</div><span class="info-btn" onmouseenter="showTooltip('cat-donut',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-body"><div class="chart-wrap"><canvas id="chart-cat"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hdr"><div class="panel-title">Detalle por categoría</div><span class="info-btn" onmouseenter="showTooltip('cat-detalle',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-body" id="cat-detail"><div class="loader">Cargando…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW: AVANCE Y DELIVERY ── -->
+<div class="view" id="view-avance">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Avance y Delivery Plan</div>
+      <div class="page-sub">Progreso de iniciativas · Tasks planificadas vs cerradas</div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">Avance promedio</div><div class="kpi-val" id="av-kpi-dev">—</div><div class="kpi-sub">Tasks cerradas / planificadas</div></div>
+    <div class="kpi"><div class="kpi-label">Tasks planificadas</div><div class="kpi-val" id="av-kpi-total">—</div><div class="kpi-sub">Total en todas las iniciativas</div></div>
+    <div class="kpi"><div class="kpi-label">Tasks cerradas</div><div class="kpi-val" id="av-kpi-cerradas">—</div><div class="kpi-sub">Completadas al día de hoy</div></div>
+    <div class="kpi"><div class="kpi-label">Tasks sin cerrar</div><div class="kpi-val" id="av-kpi-open">—</div><div class="kpi-sub">New + Active pendientes</div></div>
+  </div>
+
+  <!-- Avance por iniciativa -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div style="display:flex;align-items:center"><div class="panel-title">% Avance por iniciativa</div><span class="info-btn" onmouseenter="showTooltip('avance-ini',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-badge">Tasks cerradas / tasks planificadas</div>
+    </div>
+    <div class="panel-body" id="avance-ini-content"><div class="loader">Cargando…</div></div>
+  </div>
+
+  <!-- Delivery Plan -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div style="display:flex;align-items:center"><div class="panel-title">Delivery plan</div><span class="info-btn" onmouseenter="showTooltip('delivery',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-badge">Fecha inicio primera task → fecha fin última task</div>
+    </div>
+    <div class="panel-body" id="delivery-content"><div class="loader">Cargando…</div></div>
+  </div>
+</div>
+
+<!-- ── VIEW: EQUIPO ── -->
+<div class="view" id="view-equipo">
+  <div class="topbar">
+    <div><div class="page-title">Equipo</div><div class="page-sub">Colaboradores del proyecto · El historial es permanente para conservar datos de meses anteriores</div></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-sec" onclick="openModalCargaEquipo()">↑ Carga masiva</button>
+      <button class="btn-pri" onclick="openModalEquipo()">+ Agregar colaborador</button>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title">Colaboradores</div>
+      <div class="search-wrap">
+        <input type="text" id="equipo-search" class="search-input"
+          placeholder="Buscar por nombre o correo…"
+          oninput="filterEquipo()">
+        <span class="search-count" id="equipo-count"></span>
+      </div>
+    </div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl" id="equipo-table">
+        <thead><tr>
+          <th>Nombre</th><th>Correo</th><th>Empresa</th><th>Rol</th><th>Estado</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="equipo-tbody"><tr><td colspan="6"><div class="loader">Cargando…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW: TARIFAS ── -->
+<div class="view" id="view-tarifas">
+  <div class="topbar">
+    <div><div class="page-title">Tarifas</div><div class="page-sub">Costo por hora según empresa y rol · Se usa para calcular el costo de cada task</div></div>
+    <button class="btn-pri" onclick="openModalTarifa()">+ Agregar tarifa</button>
+  </div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl" id="tarifas-table">
+        <thead><tr>
+          <th>Empresa</th><th>Rol</th><th class="num">Tarifa ($/hora)</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="tarifas-tbody"><tr><td colspan="4"><div class="loader">Cargando…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW: HISTORIAL CSV ── -->
+<div class="view" id="view-historial">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Historial de cargas CSV</div>
+      <div class="page-sub">Últimas 5 cargas · Puedes restaurar cualquier versión anterior si una carga generó errores</div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl" id="historial-table">
+        <thead><tr>
+          <th>Archivo</th><th>Fecha</th><th>Usuario</th>
+          <th class="num">Tasks</th><th class="num">Iniciativas</th>
+          <th class="num">Sin lookup</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="historial-tbody"><tr><td colspan="7"><div class="loader">Cargando…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW: USUARIOS (admin) ── -->
+<div class="view" id="view-usuarios">
+  <div class="topbar">
+    <div><div class="page-title">Gestión de usuarios</div><div class="page-sub">Administra quién puede acceder al portal</div></div>
+    <button class="btn-pri" onclick="openModalNuevoUsuario()">+ Nuevo usuario</button>
+  </div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl" id="users-table">
+        <thead><tr><th>Nombre</th><th>Email</th><th>Perfil</th><th>Estado</th><th>Último acceso</th><th>Acciones</th></tr></thead>
+        <tbody id="users-tbody"><tr><td colspan="6"><div class="loader">Cargando…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW: CARGAR EXCEL (admin) ── -->
+<div class="view" id="view-cargar">
+  <div class="topbar"><div><div class="page-title">Cargar CSV de ADO</div><div class="page-sub">Exporta el query desde Azure DevOps y súbelo aquí — el portal procesa todo automáticamente</div></div></div>
+  <div class="panel">
+    <div class="panel-body">
+      <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <div style="font-size:32px;margin-bottom:12px">📊</div>
+        <div style="font-size:14px;font-weight:500;color:var(--navy);margin-bottom:6px">Arrastra el archivo CSV aquí</div>
+        <div style="font-size:12px;color:var(--muted)">o haz clic para seleccionar · Formato <strong>.csv</strong> · Exportado directamente desde Azure DevOps</div>
+        <input type="file" id="file-input" accept=".csv,text/csv" style="display:none" onchange="uploadCSV(this.files[0])">
+      </div>
+      <div id="upload-status" style="margin-top:1rem;display:none"></div>
+      <div style="margin-top:1.5rem;padding:1rem;background:var(--surface);border:1px solid var(--border);border-radius:2px">
+        <div style="font-size:11px;font-weight:500;color:var(--navy);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Reglas de importación</div>
+        <ul style="font-size:12px;color:var(--muted);line-height:1.9;padding-left:1.25rem">
+          <li>Se procesan todos los registros donde <strong>Work Item Type = Task</strong></li>
+          <li>Solo tasks con <strong>State = Closed</strong> y <strong>Completed Work &gt; 0</strong> aparecen en el dashboard</li>
+          <li>El portal resuelve la jerarquía <strong>Iniciativa → Epic → HU → Task</strong> automáticamente</li>
+          <li>La empresa y rol se obtienen cruzando el correo con la tabla de <strong>Equipo</strong></li>
+          <li>El costo se calcula con la <strong>Tarifa</strong> definida para cada empresa + rol</li>
+          <li>El personal de <strong>Empresa = Diners</strong> es excluido automáticamente</li>
+          <li>Los correos sin registro en Equipo se listan como advertencia al finalizar</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW: LOGS (admin) ── -->
+<div class="view" id="view-logs">
+  <div class="topbar"><div><div class="page-title">Log de accesos</div><div class="page-sub">Últimos 100 eventos de autenticación</div></div></div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Fecha</th><th>Email</th><th>Evento</th><th>IP</th></tr></thead>
+        <tbody id="logs-tbody"><tr><td colspan="4"><div class="loader">Cargando…</div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+</div>
+
+<!-- MODAL NUEVO USUARIO -->
+<div class="modal-overlay" id="modal-usuario">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="modal-user-title">Nuevo usuario</div></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nombre completo</label><input type="text" id="u-nombre" class="form-input" placeholder="Nombre Apellido"></div>
+      <div class="form-group"><label class="form-label">Correo electrónico</label><input type="email" id="u-email" class="form-input" placeholder="correo@dinersclub.com.ec"></div>
+      <div class="form-group"><label class="form-label">Contraseña temporal</label><input type="text" id="u-pass" class="form-input" placeholder="Mínimo 8 caracteres"></div>
+      <div class="form-group">
+        <label class="form-label">Perfil de acceso</label>
+        <select id="u-perfil" class="form-select">
+          <option value="gerente">Gerente — solo horas, sin costos</option>
+          <option value="gerente_costos">Gerente con costos — horas y costos</option>
+          <option value="admin">Administrador — acceso total</option>
+        </select>
+      </div>
+      <div class="hint-box" id="modal-perfil-hint">
+        <strong>Gerente:</strong> Ve horas sin costos · <strong>Gerente con costos:</strong> Ve horas y costos · <strong>Admin:</strong> Todo + gestión de usuarios
+      </div>
+      <div class="error-msg" id="u-err">Error al crear el usuario</div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn-sec" onclick="closeModal('modal-usuario')">Cancelar</button>
+      <button class="btn-pri" onclick="createUser()">Crear usuario</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+
+<!-- Modal: Equipo -->
+<div class="modal-overlay" id="modal-equipo">
+  <div class="modal">
+    <div class="modal-title" id="modal-equipo-title">Agregar colaborador</div>
+    <input id="eq-id" type="hidden" value="">
+    <div class="form-row">
+      <label class="form-label">Nombre completo</label>
+      <input id="eq-nombre" class="form-input" placeholder="Apellido, Nombre">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Correo (debe coincidir con ADO)</label>
+      <input id="eq-correo" class="form-input" placeholder="nombre@empresa.com" type="email">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Empresa</label>
+      <input id="eq-empresa" class="form-input" placeholder="Sofka, Opinno, Byteq…">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Rol</label>
+      <input id="eq-rol" class="form-input" placeholder="Desarrollador React, QA…">
+    </div>
+    <div class="modal-err" id="eq-err"></div>
+    <div class="modal-actions">
+      <button class="btn-sec" onclick="document.getElementById('modal-equipo').classList.remove('show')">Cancelar</button>
+      <button class="btn-pri" onclick="saveEquipo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Tarifa -->
+<div class="modal-overlay" id="modal-tarifa">
+  <div class="modal">
+    <div class="modal-title" id="modal-tarifa-title">Agregar tarifa</div>
+    <input id="tar-id" type="hidden" value="">
+    <div class="form-row">
+      <label class="form-label">Empresa</label>
+      <input id="tar-empresa" class="form-input" placeholder="Sofka, Opinno, Byteq…">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Rol</label>
+      <input id="tar-rol" class="form-input" placeholder="Desarrollador React, QA…">
+    </div>
+    <div class="form-row">
+      <label class="form-label">Tarifa ($ por hora)</label>
+      <input id="tar-valor" class="form-input" type="number" step="0.01" placeholder="0.00">
+    </div>
+    <div class="modal-err" id="tar-err"></div>
+    <div class="modal-actions">
+      <button class="btn-sec" onclick="document.getElementById('modal-tarifa').classList.remove('show')">Cancelar</button>
+      <button class="btn-pri" onclick="saveTarifa()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Carga masiva equipo -->
+<div class="modal-overlay" id="modal-carga-equipo">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-title">Carga masiva de equipo</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">
+      Sube un Excel con los colaboradores. La primera fila debe ser el encabezado.
+      Los correos existentes se actualizarán; los nuevos se agregarán.
+    </p>
+
+    <!-- Columnas requeridas -->
+    <div style="background:var(--surface2);border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:11px">
+      <div style="font-weight:600;color:var(--text);margin-bottom:6px">Columnas requeridas (en este orden):</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:4px;color:var(--muted)">
+        <div><code style="color:var(--blue-el)">nombre</code> — Nombre completo</div>
+        <div><code style="color:var(--blue-el)">correo</code> — Email (igual al de ADO)</div>
+        <div><code style="color:var(--blue-el)">empresa</code> — Sofka, Opinno, etc.</div>
+        <div><code style="color:var(--blue-el)">rol</code> — Desarrollador React, QA…</div>
+      </div>
+    </div>
+
+    <button class="btn-sec" onclick="descargarTemplateEquipo()" style="width:100%;margin-bottom:12px">
+      ↓ Descargar template Excel
+    </button>
+
+    <div id="equipo-dropzone" style="border:2px dashed var(--border2);border-radius:var(--r-lg);padding:24px;text-align:center;cursor:pointer;transition:background .15s"
+      onclick="document.getElementById('equipo-file-input').click()"
+      ondragover="event.preventDefault();this.style.background='var(--surface2)'"
+      ondragleave="this.style.background=''"
+      ondrop="event.preventDefault();this.style.background='';importarEquipoExcel(event.dataTransfer.files[0])">
+      <div style="font-size:13px;color:var(--muted)">Arrastra el Excel aquí o haz clic para seleccionar</div>
+      <div style="font-size:11px;color:var(--light);margin-top:4px">Formato .xlsx</div>
+    </div>
+    <input type="file" id="equipo-file-input" accept=".xlsx" style="display:none"
+      onchange="importarEquipoExcel(this.files[0])">
+
+    <div id="equipo-import-status" style="margin-top:10px"></div>
+
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn-sec" onclick="document.getElementById('modal-carga-equipo').classList.remove('show')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Tasks por persona -->
+<div class="modal-overlay" id="modal-persona-tasks">
+  <div class="modal" style="max-width:780px;width:95vw">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div class="modal-title" style="margin-bottom:2px" id="modal-persona-titulo">—</div>
+        <div style="font-size:11px;color:var(--muted)" id="modal-persona-total"></div>
+      </div>
+      <button class="btn-sec" onclick="document.getElementById('modal-persona-tasks').classList.remove('show')">✕ Cerrar</button>
+    </div>
+    <div style="overflow-x:auto;max-height:65vh;overflow-y:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>ID</th>
+          <th>Task</th>
+          <th>Iniciativa</th>
+          <th class="num">Horas</th>
+          <th class="num" id="th-costo-persona-modal">Costo</th>
+          <th>Mes</th>
+        </tr></thead>
+        <tbody id="modal-persona-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Log de carga CSV -->
+<div class="modal-overlay" id="modal-log-historial">
+  <div class="modal" style="max-width:560px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div class="modal-title" style="margin-bottom:2px" id="modal-log-titulo">—</div>
+        <div style="font-size:11px;color:var(--muted)">Detalle del proceso de carga</div>
+      </div>
+      <button class="btn-sec" onclick="document.getElementById('modal-log-historial').classList.remove('show')">✕ Cerrar</button>
+    </div>
+    <div id="modal-log-cuerpo"></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
