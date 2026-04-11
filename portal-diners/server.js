@@ -722,6 +722,22 @@ app.get('/api/datos/persona/:nombre/tasks', authMiddleware, (req,res) => {
     horas_completadas: Math.round((r.horas_completadas||0)*10)/10
   })));
 });
+app.get('/api/datos/personas/export', authMiddleware, (req,res) => {
+  const {where,params} = buildWhere(req.query);
+  const rows = db.all(`
+    SELECT nombre_persona, empresa, rol,
+           nombre_iniciativa, nombre_epic, nombre_hu,
+           nombre_task, id_task, mes, anio,
+           horas_completadas, costo
+    FROM datos_horas ${where}
+    ORDER BY nombre_persona, anio DESC, mes DESC, horas_completadas DESC
+  `, params);
+  res.json(rows.map(r => ({
+    ...r,
+    costo: vc(req.user) ? Math.round(r.costo||0) : null,
+    horas_completadas: Math.round((r.horas_completadas||0)*10)/10
+  })));
+});
 app.get('/api/datos/empresa-rol', authMiddleware, (req,res) => {
   const {where,params} = buildWhere(req.query);
   res.json(db.all(`SELECT empresa,rol,SUM(horas_completadas) as horas FROM datos_horas ${where} GROUP BY empresa,rol ORDER BY empresa,horas DESC`, params).map(r=>({...r,horas:Math.round((r.horas||0)*10)/10})));

@@ -837,6 +837,85 @@ function filterPersonas() {
   ));
 }
 
+async function exportPersonasExcel() {
+  const btn = document.getElementById('btn-export-personas');
+  btn.disabled = true; btn.textContent = 'Generando…';
+
+  try {
+    const verCostos = ['admin','gerente'].includes(USER.perfil);
+    const q = getFilters();
+    const rows = await api('/api/datos/personas/export' + (q ? q : ''));
+
+    // Aplicar búsqueda de texto si hay algo escrito
+    const search = document.getElementById('persona-search').value.toLowerCase();
+    const data = search
+      ? rows.filter(r => r.nombre_persona.toLowerCase().includes(search) ||
+                         (r.empresa||'').toLowerCase().includes(search) ||
+                         (r.rol||'').toLowerCase().includes(search))
+      : rows;
+
+    if (!data.length) { alert('No hay datos para exportar con los filtros aplicados.'); return; }
+
+    const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    // ── Hoja 1: Resumen por persona ──────────────────────────────────────────
+    const resumenMap = {};
+    data.forEach(r => {
+      if (!resumenMap[r.nombre_persona]) {
+        resumenMap[r.nombre_persona] = { nombre: r.nombre_persona, empresa: r.empresa, rol: r.rol, horas: 0, costo: 0 };
+      }
+      resumenMap[r.nombre_persona].horas += r.horas_completadas || 0;
+      resumenMap[r.nombre_persona].costo += r.costo || 0;
+    });
+    const resumenHeaders = ['Nombre', 'Empresa', 'Rol', 'Horas'];
+    if (verCostos) resumenHeaders.push('Costo ($)');
+    const resumenRows = Object.values(resumenMap)
+      .sort((a,b) => b.horas - a.horas)
+      .map(r => {
+        const row = [r.nombre, r.empresa, r.rol, Math.round(r.horas * 10) / 10];
+        if (verCostos) row.push(Math.round(r.costo));
+        return row;
+      });
+    const wsResumen = XLSX.utils.aoa_to_sheet([resumenHeaders, ...resumenRows]);
+    wsResumen['!cols'] = [{wch:30},{wch:18},{wch:22},{wch:10},{wch:12}];
+
+    // ── Hoja 2: Detalle de tasks ─────────────────────────────────────────────
+    const taskHeaders = ['Persona','Empresa','Rol','Iniciativa','Epic','HU','Task','ID Task','Año','Mes','Horas'];
+    if (verCostos) taskHeaders.push('Costo ($)');
+    const taskRows = data.map(r => {
+      const row = [
+        r.nombre_persona, r.empresa, r.rol,
+        r.nombre_iniciativa || '', r.nombre_epic || '', r.nombre_hu || '',
+        r.nombre_task || '', r.id_task || '',
+        r.anio, MESES[r.mes] || r.mes,
+        r.horas_completadas
+      ];
+      if (verCostos) row.push(r.costo || 0);
+      return row;
+    });
+    const wsTasks = XLSX.utils.aoa_to_sheet([taskHeaders, ...taskRows]);
+    wsTasks['!cols'] = [{wch:30},{wch:18},{wch:22},{wch:30},{wch:30},{wch:30},{wch:40},{wch:12},{wch:6},{wch:12},{wch:8},{wch:12}];
+
+    // ── Armar workbook y descargar ───────────────────────────────────────────
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+    XLSX.utils.book_append_sheet(wb, wsTasks, 'Tasks');
+
+    // Nombre del archivo con filtros aplicados
+    const params = new URLSearchParams(q.replace(/^\?/,''));
+    const partes = [];
+    if (params.get('anio'))    partes.push(params.get('anio'));
+    if (params.get('mes'))     partes.push(MESES[parseInt(params.get('mes'))]);
+    if (params.get('empresa')) partes.push(params.get('empresa'));
+    if (search)                partes.push(search);
+    const sufijo = partes.length ? '_' + partes.join('_') : '';
+    XLSX.writeFile(wb, `horas_personas${sufijo}.xlsx`);
+
+  } finally {
+    btn.disabled = false; btn.textContent = '↓ Exportar Excel';
+  }
+}
+
 // ─── CATEGORÍAS ──────────────────────────────────────────────────────────────
 async function loadCategorias() {
   const q = getFilters();

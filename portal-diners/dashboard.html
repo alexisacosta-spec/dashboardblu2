@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600;6..12,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -560,7 +561,10 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
   <div class="panel">
     <div class="panel-hdr">
       <div class="panel-title">Equipo completo</div>
-      <input type="text" id="persona-search" class="filter-sel" placeholder="Buscar nombre…" oninput="filterPersonas()" style="width:200px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="persona-search" class="filter-sel" placeholder="Buscar nombre…" oninput="filterPersonas()" style="width:200px">
+        <button class="btn-sm" id="btn-export-personas" onclick="exportPersonasExcel()" title="Exportar a Excel con filtros aplicados">↓ Exportar Excel</button>
+      </div>
     </div>
     <div class="panel-body" style="overflow-x:auto">
       <table class="tbl" id="personas-table">
