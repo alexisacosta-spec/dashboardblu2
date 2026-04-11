@@ -7,8 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600;6..12,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="styles.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="bg"><div class="bg-grid"></div></div>
@@ -233,6 +233,7 @@
       <div class="search-wrap">
         <input type="text" id="persona-search" class="search-input" placeholder="Buscar nombre, empresa o rol…" oninput="filterPersonas()">
         <span class="search-count" id="personas-count"></span>
+        <button class="btn-sm" id="btn-export-personas" onclick="exportPersonasExcel()" title="Exportar a Excel con filtros aplicados">↓ Exportar Excel</button>
       </div>
     </div>
     <div class="panel-body" style="overflow-x:auto">
