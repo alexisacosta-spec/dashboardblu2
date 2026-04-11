@@ -586,11 +586,23 @@ async function drillHu(idHu, huNombre) {
 
 // ─── AVANCE / DELIVERY / QA ──────────────────────────────────────────────────
 async function loadAvance() {
+  // Precargar mes actual si los inputs están vacíos
+  const elDesde = document.getElementById('av-desde');
+  const elHasta = document.getElementById('av-hasta');
+  if (elDesde && !elDesde.value) {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    const primerDia = new Date(y, m, 1);
+    const ultimoDia = new Date(y, m + 1, 0);
+    elDesde.value = primerDia.toISOString().slice(0, 10);
+    elHasta.value = ultimoDia.toISOString().slice(0, 10);
+  }
+
   document.getElementById('avance-ini-content').innerHTML = '<div class="loader">Cargando…</div>';
   document.getElementById('delivery-content').innerHTML   = '<div class="loader">Cargando…</div>';
   try {
-    const desde = document.getElementById('av-desde')?.value;
-    const hasta  = document.getElementById('av-hasta')?.value;
+    const desde = elDesde?.value;
+    const hasta  = elHasta?.value;
     let qs = '';
     if (desde && hasta) qs = `?desde=${desde}&hasta=${hasta}`;
     const avance = await api('/api/datos/avance-iniciativas' + qs);
