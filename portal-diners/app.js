@@ -706,51 +706,44 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
   const today = new Date(); today.setHours(0,0,0,0);
   const todayPct = Math.min(100, Math.max(0, (today - rangeStart) / 86400000 / rangeDays * 100));
 
-  // ── Generar semanas ────────────────────────────────────────────────────────
-  // Cada semana: { start: Date, leftPct, widthPct, label }
-  const weeks = [];
-  let cur = new Date(rangeStart);
-  while (cur < rangeEnd) {
-    const wStart = new Date(cur);
-    const wEnd   = new Date(cur); wEnd.setDate(wEnd.getDate() + 7);
-    const leftPct  = (wStart - rangeStart) / 86400000 / rangeDays * 100;
-    const widthPct = Math.min(100 - leftPct, 7 / rangeDays * 100);
-    weeks.push({ start: new Date(wStart), leftPct, widthPct,
-      label: `${wStart.getDate()} ${MES[wStart.getMonth()]}` });
-    cur.setDate(cur.getDate() + 7);
+  // ── Generar lista de días ──────────────────────────────────────────────────
+  const allDays = [];
+  { let cur = new Date(rangeStart);
+    while (cur < rangeEnd) { allDays.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
   }
 
-  // ── Generar bloques de mes ─────────────────────────────────────────────────
-  // Agrupamos semanas por mes (mes de la fecha de inicio de la semana)
+  // ── Generar bloques de mes agrupando días ──────────────────────────────────
   const monthMap = new Map();
-  for (const w of weeks) {
-    const key = `${w.start.getFullYear()}-${w.start.getMonth()}`;
+  for (const d of allDays) {
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
     if (!monthMap.has(key)) {
-      monthMap.set(key, { label: `${MES[w.start.getMonth()]} ${String(w.start.getFullYear()).slice(2)}`,
-        leftPct: w.leftPct, widthPct: 0, weeks: [] });
+      monthMap.set(key, { label: `${MES[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, days: [] });
     }
-    const m = monthMap.get(key);
-    m.widthPct += w.widthPct;
-    m.weeks.push(w);
+    monthMap.get(key).days.push(d);
   }
   const months = [...monthMap.values()];
 
-  // ── Cabecera dos niveles ───────────────────────────────────────────────────
+  // ── Cabecera dos niveles: mes arriba, días abajo ───────────────────────────
   const monthsHdr = months.map(m => {
-    const weeksInner = m.weeks.map(w =>
-      `<div class="gantt-week-lbl" style="width:${(w.widthPct / m.widthPct * 100).toFixed(2)}%">${w.label}</div>`
-    ).join('');
-    return `<div class="gantt-hdr-month-block" style="width:${m.widthPct.toFixed(2)}%">
+    const monthWidthPct = m.days.length / rangeDays * 100;
+    const daysInner = m.days.map(d => {
+      const isMonday = d.getDay() === 1;
+      const borderStyle = isMonday ? 'border-left:1px solid var(--border2)' : '';
+      return `<div class="gantt-day-lbl" style="${borderStyle}">${d.getDate()}</div>`;
+    }).join('');
+    return `<div class="gantt-hdr-month-block" style="width:${monthWidthPct.toFixed(2)}%">
       <div class="gantt-month-lbl">${m.label}</div>
-      <div class="gantt-hdr-weeks">${weeksInner}</div>
+      <div class="gantt-hdr-weeks">${daysInner}</div>
     </div>`;
   }).join('');
 
-  // ── Líneas verticales (semanas y meses) ────────────────────────────────────
-  const vlines = weeks.map((w,i) => {
-    const isMonthBound = i > 0 && weeks[i].start.getMonth() !== weeks[i-1].start.getMonth();
-    const cls = isMonthBound ? 'gantt-vline-month' : 'gantt-vline-week';
-    return `<div class="${cls}" style="left:${w.leftPct.toFixed(2)}%"></div>`;
+  // ── Líneas verticales: lunes=semana, día 1=mes ─────────────────────────────
+  const vlines = allDays.map((d, i) => {
+    if (i === 0) return '';
+    const leftPct = (d - rangeStart) / 86400000 / rangeDays * 100;
+    if (d.getDate() === 1) return `<div class="gantt-vline-month" style="left:${leftPct.toFixed(2)}%"></div>`;
+    if (d.getDay() === 1)  return `<div class="gantt-vline-week"  style="left:${leftPct.toFixed(2)}%"></div>`;
+    return '';
   }).join('');
 
   // ── Función de clasificación con umbrales gerenciales ─────────────────────
@@ -766,10 +759,14 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
 
   // ── Filas de barras ────────────────────────────────────────────────────────
   const barsHtml = sorted.map(r => {
-    const ini   = new Date(r.fecha_ini);
-    const fin   = new Date(r.fecha_fin);
-    const left  = Math.max(0, (ini - rangeStart) / 86400000 / rangeDays * 100);
-    const width = Math.min(100 - left, (fin - ini + 86400000) / 86400000 / rangeDays * 100);
+    const ini = new Date(r.fecha_ini);
+    const fin = new Date(r.fecha_fin);
+    // Recortar al rango visible
+    const visStart = new Date(Math.max(ini.getTime(), rangeStart.getTime()));
+    const visEnd   = new Date(Math.min(fin.getTime(), rangeEnd.getTime()));
+    if (visStart > visEnd) return '';
+    const left  = (visStart - rangeStart) / 86400000 / rangeDays * 100;
+    const width = Math.max(0.5, (visEnd - visStart + 86400000) / 86400000 / rangeDays * 100);
     const dIni  = `${ini.getDate()} ${MES[ini.getMonth()]}`;
     const dFin  = `${fin.getDate()} ${MES[fin.getMonth()]}`;
     const cls   = clasificar(r);
@@ -790,7 +787,7 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
         </div>
       </div>
     </div>`;
-  }).join('');
+  }).filter(Boolean).join('');
 
   document.getElementById('delivery-content').innerHTML = `
     <div class="gantt-outer"><div class="gantt-inner">
