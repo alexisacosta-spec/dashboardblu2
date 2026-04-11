@@ -325,8 +325,8 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 .perfil-badge{font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700;
   letter-spacing:.05em;text-transform:uppercase}
 .perfil-admin{background:#FEE2E2;color:#9B1C1C}
-.perfil-gerente_costos{background:#D1FAE5;color:#065F46}
-.perfil-gerente{background:#DBEAFE;color:#1E40AF}
+.perfil-gerente{background:#D1FAE5;color:#065F46}
+.perfil-gestor{background:#DBEAFE;color:#1E40AF}
 
 /* No data */
 .no-data{text-align:center;padding:2rem;color:var(--light);font-size:13px}

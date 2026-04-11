@@ -26,7 +26,7 @@ const db = new Database(DB_PATH);
 db.run(`CREATE TABLE IF NOT EXISTS usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nombre TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL, perfil TEXT NOT NULL DEFAULT 'gerente',
+  password_hash TEXT NOT NULL, perfil TEXT NOT NULL DEFAULT 'gestor',
   activo INTEGER NOT NULL DEFAULT 1,
   creado_en TEXT DEFAULT (datetime('now')), ultimo_acceso TEXT
 )`);
@@ -155,7 +155,7 @@ function adminOnly(req, res, next) {
   if (req.user.perfil !== 'admin') return res.status(403).json({ error: 'Acceso denegado' });
   next();
 }
-const vc = u => ['admin','gerente_costos'].includes(u.perfil);
+const vc = u => ['admin','gerente'].includes(u.perfil);
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 app.post('/api/auth/login', (req, res) => {
@@ -207,7 +207,7 @@ app.get('/api/admin/usuarios', authMiddleware, adminOnly, (req, res) => {
 app.post('/api/admin/usuarios', authMiddleware, adminOnly, (req, res) => {
   const {nombre,email,password,perfil} = req.body;
   if (!nombre||!email||!password||!perfil) return res.status(400).json({error:'Todos los campos son requeridos'});
-  if (!['admin','gerente_costos','gerente'].includes(perfil)) return res.status(400).json({error:'Perfil inválido'});
+  if (!['admin','gerente','gestor'].includes(perfil)) return res.status(400).json({error:'Perfil inválido'});
   try {
     db.run('INSERT INTO usuarios (nombre,email,password_hash,perfil) VALUES (?,?,?,?)',
       [nombre, email.toLowerCase().trim(), bcrypt.hashSync(password,10), perfil]);

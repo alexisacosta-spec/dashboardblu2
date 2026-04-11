@@ -335,8 +335,8 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 .perfil-badge{font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700;
   letter-spacing:.05em;text-transform:uppercase}
 .perfil-admin{background:#FEE2E2;color:#9B1C1C}
-.perfil-gerente_costos{background:#D1FAE5;color:#065F46}
-.perfil-gerente{background:#DBEAFE;color:#1E40AF}
+.perfil-gerente{background:#D1FAE5;color:#065F46}
+.perfil-gestor{background:#DBEAFE;color:#1E40AF}
 
 /* No data */
 .no-data{text-align:center;padding:2rem;color:var(--light);font-size:13px}
@@ -662,13 +662,13 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
       <div class="form-group">
         <label class="form-label">Perfil de acceso</label>
         <select id="u-perfil" class="form-select">
-          <option value="gerente">Gerente — solo horas, sin costos</option>
-          <option value="gerente_costos">Gerente con costos — horas y costos</option>
+          <option value="gestor">Gestor — solo horas, sin costos</option>
+          <option value="gerente">Gerente — horas y costos</option>
           <option value="admin">Administrador — acceso total</option>
         </select>
       </div>
       <div class="hint-box" id="modal-perfil-hint">
-        <strong>Gerente:</strong> Ve horas sin costos · <strong>Gerente con costos:</strong> Ve horas y costos · <strong>Admin:</strong> Todo + gestión de usuarios
+        <strong>Gestor:</strong> Ve horas sin costos · <strong>Gerente:</strong> Ve horas y costos · <strong>Admin:</strong> Todo + gestión de usuarios
       </div>
       <div class="error-msg" id="u-err">Error al crear el usuario</div>
     </div>
@@ -807,11 +807,11 @@ async function showDashboard() {
   showScreen('dashboard');
   document.getElementById('sb-nm').textContent = USER.nombre;
   document.getElementById('sb-av').textContent = USER.nombre.split(' ').map(w=>w[0]).slice(0,2).join('');
-  const roles = {admin:'Administrador',gerente_costos:'Gerente · Con costos',gerente:'Gerente'};
+  const roles = {admin:'Administrador',gerente:'Gerente · Con costos',gestor:'Gestor'};
   document.getElementById('sb-rl').textContent = roles[USER.perfil] || USER.perfil;
 
   const isAdmin = USER.perfil === 'admin';
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   if (isAdmin) {
     document.getElementById('sb-admin-sec').style.display = '';
@@ -967,7 +967,7 @@ async function loadIniciativas() {
   document.getElementById('ini-breadcrumb').style.display = 'none';
   const q = getFilters();
   const rows = await api('/api/datos/por-iniciativa'+q);
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
   const totalH = rows.reduce((s,r)=>s+r.horas,0);
 
   document.getElementById('ini-content').innerHTML = rows.length ? `
@@ -1021,7 +1021,7 @@ async function drillIniciativa(idIni, nombre) {
     return;
   }
 
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   if (!rows.length) {
     document.getElementById('ini-content').innerHTML =
@@ -1049,7 +1049,7 @@ async function drillEpic(epicId, epicNombre) {
   document.getElementById('ini-content').innerHTML = '<div class="loader">Cargando Tasks…</div>';
 
   const rows = await api('/api/datos/epic/'+encodeURIComponent(epicId)+'/tasks?epicNombre='+encodeURIComponent(epicNombre));
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   if (!rows.length) {
     document.getElementById('ini-content').innerHTML =
@@ -1081,7 +1081,7 @@ async function drillEpic(epicId, epicNombre) {
 async function loadEmpresas() {
   const q = getFilters();
   const [emp, heatmap] = await Promise.all([api('/api/datos/por-empresa'+q), api('/api/datos/empresa-rol'+q)]);
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   // Chart barras
   if (chartEmpBar) chartEmpBar.destroy();
@@ -1125,14 +1125,14 @@ async function loadEmpresas() {
 async function loadPersonas() {
   const q = getFilters();
   allPersonas = await api('/api/datos/por-persona'+q);
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
   document.getElementById('personas-sub').textContent = `${allPersonas.length} colaboradores · Haz clic en el encabezado para ordenar`;
   if (!verCostos) document.getElementById('th-costo-per').style.display = 'none';
   renderPersonasTable(allPersonas);
 }
 
 function renderPersonasTable(rows) {
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
   document.getElementById('personas-tbody').innerHTML = rows.length ?
     rows.map(r=>`<tr>
       <td>${r.nombre_persona}</td>
@@ -1153,7 +1153,7 @@ function filterPersonas() {
 async function loadCategorias() {
   const q = getFilters();
   const rows = await api('/api/datos/por-categoria'+q);
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
   const total = rows.reduce((s,r)=>s+r.horas,0);
   const cols = ['#0A1628','#6B7280','#B4B2A9','#D3D1C7','#1a3060'];
 
@@ -1176,7 +1176,7 @@ async function loadCategorias() {
 // ─── USUARIOS ────────────────────────────────────────────────────────────────
 async function loadUsuarios() {
   const users = await api('/api/admin/usuarios');
-  const PERFILES = {admin:'Administrador',gerente_costos:'Gte. con costos',gerente:'Gerente'};
+  const PERFILES = {admin:'Administrador',gerente:'Gte. con costos',gestor:'Gestor'};
   document.getElementById('users-tbody').innerHTML = users.map(u=>`
     <tr>
       <td>${u.nombre}</td>
@@ -1193,7 +1193,7 @@ async function loadUsuarios() {
 
 function openModalNuevoUsuario() {
   ['u-nombre','u-email','u-pass'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('u-perfil').value = 'gerente';
+  document.getElementById('u-perfil').value = 'gestor';
   document.getElementById('u-err').classList.remove('show');
   document.getElementById('modal-usuario').classList.add('show');
 }

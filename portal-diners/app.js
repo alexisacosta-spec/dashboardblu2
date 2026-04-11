@@ -185,11 +185,11 @@ async function showDashboard() {
   showScreen('dashboard');
   document.getElementById('sb-nm').textContent = USER.nombre;
   document.getElementById('sb-av').textContent = USER.nombre.split(' ').map(w=>w[0]).slice(0,2).join('');
-  const roles = {admin:'Administrador',gerente_costos:'Gerente · Con costos',gerente:'Gerente'};
+  const roles = {admin:'Administrador',gerente:'Gerente · Con costos',gestor:'Gestor'};
   document.getElementById('sb-rl').textContent = roles[USER.perfil] || USER.perfil;
 
   const isAdmin = USER.perfil === 'admin';
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   if (isAdmin) {
     document.getElementById('sb-admin-sec').style.display = '';
@@ -384,7 +384,7 @@ async function loadIniciativas() {
 }
 
 function renderIniciativasTable(rows) {
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
   const totalH = rows.reduce((s,r)=>s+r.horas,0);
 
   // Si el panel ya existe, solo actualizar tbody y count — no destruir el input
@@ -475,7 +475,7 @@ async function drillIniciativa(idIni, nombre) {
     return;
   }
 
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   if (!rows.length) {
     document.getElementById('ini-content').innerHTML =
@@ -512,7 +512,7 @@ async function drillEpic(epicId, epicNombre) {
   try { rows = await api('/api/datos/epic/' + epicId + '/hus' + getFilters()); }
   catch(e) { document.getElementById('ini-content').innerHTML = `<div class="no-data">Error: ${e.message}</div>`; return; }
 
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   if (!rows.length) {
     document.getElementById('ini-content').innerHTML =
@@ -553,7 +553,7 @@ async function drillHu(idHu, huNombre) {
   try { rows = await api('/api/datos/hu/' + idHu + '/tasks'); }
   catch(e) { document.getElementById('ini-content').innerHTML = `<div class="no-data">Error: ${e.message}</div>`; return; }
 
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   if (!rows.length) {
     document.getElementById('ini-content').innerHTML =
@@ -757,7 +757,7 @@ function renderDeliveryPlan(rows) {
 async function loadEmpresas() {
   const q = getFilters();
   const [emp, heatmap] = await Promise.all([api('/api/datos/por-empresa'+q), api('/api/datos/empresa-rol'+q)]);
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   // Chart barras
   if (chartEmpBar) chartEmpBar.destroy();
@@ -801,14 +801,14 @@ async function loadEmpresas() {
 async function loadPersonas() {
   const q = getFilters();
   allPersonas = await api('/api/datos/por-persona'+q);
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
   document.getElementById('personas-sub').textContent = `${allPersonas.length} colaboradores`;
   if (!verCostos) document.getElementById('th-costo-per').style.display = 'none';
   renderPersonasTable(allPersonas);
 }
 
 function renderPersonasTable(rows) {
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
   const countEl = document.getElementById('personas-count');
   if (countEl) countEl.textContent = rows.length + ' personas';
   document.getElementById('personas-tbody').innerHTML = rows.length ?
@@ -841,7 +841,7 @@ function filterPersonas() {
 async function loadCategorias() {
   const q = getFilters();
   const rows = await api('/api/datos/por-categoria'+q);
-  const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+  const verCostos = ['admin','gerente'].includes(USER.perfil);
   const total = rows.reduce((s,r)=>s+r.horas,0);
   const cols = ['#0A1628','#6B7280','#B4B2A9','#D3D1C7','#1a3060'];
 
@@ -864,7 +864,7 @@ async function loadCategorias() {
 // ─── USUARIOS ────────────────────────────────────────────────────────────────
 async function loadUsuarios() {
   const users = await api('/api/admin/usuarios');
-  const PERFILES = {admin:'Administrador',gerente_costos:'Gte. con costos',gerente:'Gerente'};
+  const PERFILES = {admin:'Administrador',gerente:'Gte. con costos',gestor:'Gestor'};
   document.getElementById('users-tbody').innerHTML = users.map(u=>`
     <tr>
       <td>${u.nombre}</td>
@@ -881,7 +881,7 @@ async function loadUsuarios() {
 
 function openModalNuevoUsuario() {
   ['u-nombre','u-email','u-pass'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('u-perfil').value = 'gerente';
+  document.getElementById('u-perfil').value = 'gestor';
   document.getElementById('u-err').classList.remove('show');
   document.getElementById('modal-usuario').classList.add('show');
 }
@@ -1249,7 +1249,7 @@ async function verTasksPersona(nombre_key, nombre) {
   try {
     const q = getFilters();
     const rows = await api('/api/datos/persona/' + encodeURIComponent(nombre_key) + '/tasks' + q);
-    const verCostos = ['admin','gerente_costos'].includes(USER.perfil);
+    const verCostos = ['admin','gerente'].includes(USER.perfil);
     const totalH = rows.reduce((s,r) => s + (r.horas_completadas||0), 0);
 
     tbody.innerHTML = rows.length ? rows.map(r => `<tr>
