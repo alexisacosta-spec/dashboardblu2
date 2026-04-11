@@ -755,7 +755,15 @@ app.get('/api/datos/estado', authMiddleware, (req,res) => {
   res.json({ total: (db.get('SELECT COUNT(*) as total FROM datos_horas')||{}).total||0 });
 });
 app.get('/api/datos/avance-iniciativas', authMiddleware, (req,res) => {
-  const rows = db.all(`SELECT * FROM tasks_plan WHERE id_iniciativa NOT IN ('SIN_INI','SIN PARENT','') ORDER BY cerradas DESC`);
+  const { desde, hasta } = req.query;
+  let sql = `SELECT * FROM tasks_plan WHERE id_iniciativa NOT IN ('SIN_INI','SIN PARENT','')`;
+  const params = [];
+  if (desde && hasta) {
+    sql += ` AND fecha_ini <= ? AND fecha_fin >= ?`;
+    params.push(hasta, desde);
+  }
+  sql += ` ORDER BY cerradas DESC`;
+  const rows = db.all(sql, params);
   res.json(rows.map(r => ({
     id: r.id_iniciativa, nombre: r.nombre_iniciativa,
     categoria: r.categoria_negocio || 'Sin Clasificar',

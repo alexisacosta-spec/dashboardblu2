@@ -589,17 +589,34 @@ async function loadAvance() {
   document.getElementById('avance-ini-content').innerHTML = '<div class="loader">Cargando…</div>';
   document.getElementById('delivery-content').innerHTML   = '<div class="loader">Cargando…</div>';
   try {
-    // Sin filtros temporales — avance es del proyecto completo
-    const avance = await api('/api/datos/avance-iniciativas');
+    const desde = document.getElementById('av-desde')?.value;
+    const hasta  = document.getElementById('av-hasta')?.value;
+    let qs = '';
+    if (desde && hasta) qs = `?desde=${desde}&hasta=${hasta}`;
+    const avance = await api('/api/datos/avance-iniciativas' + qs);
     renderAvanceKpis(avance);
     renderAvanceTabla(avance);
-    renderDeliveryPlan(avance);
+    renderDeliveryPlan(avance, desde || null, hasta || null);
   } catch(e) {
     ['avance-ini-content','delivery-content'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = `<div class="no-data">Error al cargar: ${e.message}</div>`;
     });
   }
+}
+
+function applyAvanceFiltro() {
+  const desde = document.getElementById('av-desde').value;
+  const hasta  = document.getElementById('av-hasta').value;
+  if (!desde || !hasta) { toast('Selecciona fecha desde y hasta', 'err'); return; }
+  if (desde > hasta) { toast('La fecha "desde" debe ser anterior a "hasta"', 'err'); return; }
+  loadAvance();
+}
+
+function clearAvanceFiltro() {
+  document.getElementById('av-desde').value = '';
+  document.getElementById('av-hasta').value = '';
+  loadAvance();
 }
 
 function renderAvanceKpis(avance) {
@@ -653,7 +670,7 @@ function renderAvanceTabla(rows) {
   document.getElementById('avance-ini-content').innerHTML = `<div style="padding-top:4px">${hdr}${rowsHtml}</div>`;
 }
 
-function renderDeliveryPlan(rows) {
+function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
   const sorted = [...rows]
     .filter(r => r.nombre !== 'SIN PARENT' && r.fecha_ini && r.fecha_fin)
     .sort((a,b) => new Date(a.fecha_ini) - new Date(b.fecha_ini));
@@ -663,62 +680,99 @@ function renderDeliveryPlan(rows) {
     return;
   }
 
-  const rangeStart = new Date('2025-12-01');
-  const rangeEnd   = new Date('2026-04-30');
-  const rangeDays  = (rangeEnd - rangeStart) / 86400000;
-  const today      = new Date();
-  today.setHours(0,0,0,0);
-  const todayPct   = Math.min(100, Math.max(0, (today - rangeStart) / 86400000 / rangeDays * 100));
+  // ── Rango visual dinámico ──────────────────────────────────────────────────
   const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const mesesHdr = ['Dic 25','Ene 26','Feb 26','Mar 26','Abr 26']
-    .map(m => `<div class="gantt-month">${m}</div>`).join('');
 
-  // ── Función de clasificación con umbrales gerenciales ──
-  function clasificar(r) {
-    const fin      = new Date(r.fecha_fin); fin.setHours(0,0,0,0);
-    const diasRest = Math.round((fin - today) / 86400000); // positivo = futuro, negativo = pasado
-    const pct      = r.pct || 0;
+  let rangeStart, rangeEnd;
+  if (filtroDesde && filtroHasta) {
+    rangeStart = new Date(filtroDesde);
+    rangeEnd   = new Date(filtroHasta);
+  } else {
+    // Ajustar al inicio de la semana del min y fin de la semana del max
+    const allIni = sorted.map(r => new Date(r.fecha_ini));
+    const allFin = sorted.map(r => new Date(r.fecha_fin));
+    rangeStart = new Date(Math.min(...allIni));
+    rangeEnd   = new Date(Math.max(...allFin));
+  }
+  // Anclar rangeStart al lunes de su semana y rangeEnd al domingo de su semana
+  const dow = rangeStart.getDay(); // 0=dom,1=lun...
+  rangeStart.setDate(rangeStart.getDate() - (dow === 0 ? 6 : dow - 1));
+  rangeStart.setHours(0,0,0,0);
+  const dowE = rangeEnd.getDay();
+  rangeEnd.setDate(rangeEnd.getDate() + (dowE === 0 ? 0 : 7 - dowE));
+  rangeEnd.setHours(0,0,0,0);
 
-    if (pct >= 100) {
-      // Completada — azul apagado independientemente de fechas
-      return {
-        estado: 'Completada',
-        color:  '#3B5EA6',   // azul corporativo apagado
-        tag:    'av-tag av-done-tag'
-      };
-    }
-    if (diasRest < 0) {
-      // Fecha fin ya pasó y no está completa → Atrasada
-      return {
-        estado: `Atrasada ${Math.abs(diasRest)}d`,
-        color:  '#8C2A2A',   // rojo corporativo oscuro
-        tag:    'av-tag av-late'
-      };
-    }
-    if (diasRest <= 14 && pct < 85) {
-      // Vence en ≤14 días con avance < 85% → En riesgo
-      return {
-        estado: `Riesgo · ${diasRest}d`,
-        color:  '#8C6A1A',   // ámbar ejecutivo
-        tag:    'av-tag av-risk-tag'
-      };
-    }
-    // Resto → En tiempo
-    return {
-      estado: `En tiempo · ${diasRest}d`,
-      color:  '#2D7A4F',   // verde sobrio
-      tag:    'av-tag av-ok-tag'
-    };
+  const rangeDays = (rangeEnd - rangeStart) / 86400000;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayPct = Math.min(100, Math.max(0, (today - rangeStart) / 86400000 / rangeDays * 100));
+
+  // ── Generar semanas ────────────────────────────────────────────────────────
+  // Cada semana: { start: Date, leftPct, widthPct, label }
+  const weeks = [];
+  let cur = new Date(rangeStart);
+  while (cur < rangeEnd) {
+    const wStart = new Date(cur);
+    const wEnd   = new Date(cur); wEnd.setDate(wEnd.getDate() + 7);
+    const leftPct  = (wStart - rangeStart) / 86400000 / rangeDays * 100;
+    const widthPct = Math.min(100 - leftPct, 7 / rangeDays * 100);
+    weeks.push({ start: new Date(wStart), leftPct, widthPct,
+      label: `${wStart.getDate()} ${MES[wStart.getMonth()]}` });
+    cur.setDate(cur.getDate() + 7);
   }
 
+  // ── Generar bloques de mes ─────────────────────────────────────────────────
+  // Agrupamos semanas por mes (mes de la fecha de inicio de la semana)
+  const monthMap = new Map();
+  for (const w of weeks) {
+    const key = `${w.start.getFullYear()}-${w.start.getMonth()}`;
+    if (!monthMap.has(key)) {
+      monthMap.set(key, { label: `${MES[w.start.getMonth()]} ${String(w.start.getFullYear()).slice(2)}`,
+        leftPct: w.leftPct, widthPct: 0, weeks: [] });
+    }
+    const m = monthMap.get(key);
+    m.widthPct += w.widthPct;
+    m.weeks.push(w);
+  }
+  const months = [...monthMap.values()];
+
+  // ── Cabecera dos niveles ───────────────────────────────────────────────────
+  const monthsHdr = months.map(m => {
+    const weeksInner = m.weeks.map(w =>
+      `<div class="gantt-week-lbl" style="width:${(w.widthPct / m.widthPct * 100).toFixed(2)}%">${w.label}</div>`
+    ).join('');
+    return `<div class="gantt-hdr-month-block" style="width:${m.widthPct.toFixed(2)}%">
+      <div class="gantt-month-lbl">${m.label}</div>
+      <div class="gantt-hdr-weeks">${weeksInner}</div>
+    </div>`;
+  }).join('');
+
+  // ── Líneas verticales (semanas y meses) ────────────────────────────────────
+  const vlines = weeks.map((w,i) => {
+    const isMonthBound = i > 0 && weeks[i].start.getMonth() !== weeks[i-1].start.getMonth();
+    const cls = isMonthBound ? 'gantt-vline-month' : 'gantt-vline-week';
+    return `<div class="${cls}" style="left:${w.leftPct.toFixed(2)}%"></div>`;
+  }).join('');
+
+  // ── Función de clasificación con umbrales gerenciales ─────────────────────
+  function clasificar(r) {
+    const fin      = new Date(r.fecha_fin); fin.setHours(0,0,0,0);
+    const diasRest = Math.round((fin - today) / 86400000);
+    const pct      = r.pct || 0;
+    if (pct >= 100) return { estado: 'Completada',              color: '#3B5EA6' };
+    if (diasRest < 0) return { estado: `Atrasada ${Math.abs(diasRest)}d`, color: '#8C2A2A' };
+    if (diasRest <= 14 && pct < 85) return { estado: `Riesgo · ${diasRest}d`, color: '#8C6A1A' };
+    return { estado: `En tiempo · ${diasRest}d`, color: '#2D7A4F' };
+  }
+
+  // ── Filas de barras ────────────────────────────────────────────────────────
   const barsHtml = sorted.map(r => {
-    const ini  = new Date(r.fecha_ini);
-    const fin  = new Date(r.fecha_fin);
-    const left = Math.max(0, (ini - rangeStart) / 86400000 / rangeDays * 100);
-    const width= Math.min(100 - left, (fin - ini) / 86400000 / rangeDays * 100);
-    const dIni = `${ini.getDate()} ${MES[ini.getMonth()]}`;
-    const dFin = `${fin.getDate()} ${MES[fin.getMonth()]}`;
-    const cls  = clasificar(r);
+    const ini   = new Date(r.fecha_ini);
+    const fin   = new Date(r.fecha_fin);
+    const left  = Math.max(0, (ini - rangeStart) / 86400000 / rangeDays * 100);
+    const width = Math.min(100 - left, (fin - ini + 86400000) / 86400000 / rangeDays * 100);
+    const dIni  = `${ini.getDate()} ${MES[ini.getMonth()]}`;
+    const dFin  = `${fin.getDate()} ${MES[fin.getMonth()]}`;
+    const cls   = clasificar(r);
 
     return `<div class="gantt-row">
       <div class="gantt-name">
@@ -729,10 +783,9 @@ function renderDeliveryPlan(rows) {
         </div>
       </div>
       <div class="gantt-track">
-        <div class="gantt-vline" style="left:20%"></div><div class="gantt-vline" style="left:40%"></div>
-        <div class="gantt-vline" style="left:60%"></div><div class="gantt-vline" style="left:80%"></div>
+        ${vlines}
         <div class="gantt-today" style="left:${todayPct.toFixed(1)}%"><span class="gantt-today-lbl">hoy</span></div>
-        <div class="gantt-bar" style="left:${left.toFixed(1)}%;width:${Math.max(width,2).toFixed(1)}%;background:${cls.color};opacity:0.88">
+        <div class="gantt-bar" style="left:${left.toFixed(1)}%;width:${Math.max(width,1).toFixed(1)}%;background:${cls.color};opacity:0.88">
           <span class="gantt-bar-lbl">${dIni} — ${dFin} · ${r.pct}%</span>
         </div>
       </div>
@@ -741,7 +794,10 @@ function renderDeliveryPlan(rows) {
 
   document.getElementById('delivery-content').innerHTML = `
     <div class="gantt-outer"><div class="gantt-inner">
-      <div class="gantt-hdr-row"><div class="gantt-label"></div><div class="gantt-months">${mesesHdr}</div></div>
+      <div class="gantt-hdr-row">
+        <div class="gantt-label"></div>
+        <div class="gantt-months gantt-hdr-months">${monthsHdr}</div>
+      </div>
       ${barsHtml}
     </div></div>
     <div class="qa-stack-legend" style="margin-top:14px;gap:16px">

@@ -270,6 +270,22 @@
       <div class="page-title">Avance y Delivery Plan</div>
       <div class="page-sub">Progreso de iniciativas · Tasks planificadas vs cerradas</div>
     </div>
+    <div class="avance-filter-bar">
+      <label class="avance-filter-label">Período</label>
+      <div class="avance-filter-inputs">
+        <div class="avance-date-group">
+          <span class="avance-date-lbl">Desde</span>
+          <input type="date" id="av-desde" class="avance-date-input">
+        </div>
+        <span class="avance-filter-sep">→</span>
+        <div class="avance-date-group">
+          <span class="avance-date-lbl">Hasta</span>
+          <input type="date" id="av-hasta" class="avance-date-input">
+        </div>
+      </div>
+      <button class="avance-filter-btn" onclick="applyAvanceFiltro()">Aplicar</button>
+      <button class="avance-filter-btn avance-filter-btn-clear" onclick="clearAvanceFiltro()">Limpiar</button>
+    </div>
   </div>
 
   <!-- KPIs -->

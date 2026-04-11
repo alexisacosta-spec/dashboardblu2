@@ -473,3 +473,39 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 .info-tooltip-formula{margin-top:6px;padding:5px 8px;
   background:rgba(43,95,232,.12);border-radius:5px;
   font-family:'Nunito Sans',monospace;font-size:10px;color:rgba(255,255,255,.9)}
+
+/* ── AVANCE FILTER BAR ── */
+.avance-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);
+  padding:8px 14px}
+.avance-filter-label{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);white-space:nowrap}
+.avance-filter-inputs{display:flex;align-items:center;gap:8px}
+.avance-date-group{display:flex;flex-direction:column;gap:2px}
+.avance-date-lbl{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.avance-date-input{padding:5px 9px;border:1.5px solid var(--border2);border-radius:var(--r);
+  font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--text);
+  background:var(--surface);outline:none;transition:border-color .15s;cursor:pointer}
+.avance-date-input:focus{border-color:var(--blue-el)}
+.avance-filter-sep{font-size:13px;color:var(--muted);margin-top:10px}
+.avance-filter-btn{padding:6px 14px;border-radius:var(--r);font-family:'Nunito Sans',sans-serif;
+  font-size:11px;font-weight:700;cursor:pointer;border:none;
+  background:var(--blue-el);color:#fff;transition:opacity .15s}
+.avance-filter-btn:hover{opacity:.85}
+.avance-filter-btn-clear{background:transparent;color:var(--muted);
+  border:1.5px solid var(--border2)}
+.avance-filter-btn-clear:hover{border-color:var(--muted);opacity:1}
+
+/* ── GANTT DOS NIVELES (meses + semanas) ── */
+.gantt-hdr-months{display:flex;flex:1;border-bottom:1.5px solid var(--border)}
+.gantt-hdr-month-block{position:relative;display:flex;flex-direction:column;
+  border-right:1px solid var(--border2);padding-bottom:4px}
+.gantt-hdr-month-block:last-child{border-right:none}
+.gantt-month-lbl{font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--text2);padding:3px 6px 2px;white-space:nowrap}
+.gantt-hdr-weeks{display:flex;flex:1;border-top:0.5px solid var(--border2)}
+.gantt-week-lbl{flex:1;text-align:center;font-size:8px;color:var(--muted);padding:2px 0;
+  border-right:0.5px solid var(--border2);white-space:nowrap;overflow:hidden}
+.gantt-week-lbl:last-child{border-right:none}
+.gantt-vline-week{position:absolute;top:0;bottom:0;width:0.5px;background:var(--border)}
+.gantt-vline-month{position:absolute;top:0;bottom:0;width:1px;background:var(--border2)}
