@@ -203,6 +203,17 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
   padding:3px 10px;border-radius:20px;border:1px solid var(--border)}
 .panel-body{padding:1.125rem 1.25rem}
 
+/* ── BOTONES DE DESCARGA DE PANEL ── */
+.panel-dl-group{display:flex;align-items:center;gap:6px}
+.panel-dl-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;
+  padding:4px 9px;border-radius:var(--r);border:1.5px solid var(--border2);
+  background:var(--surface2);color:var(--muted);cursor:pointer;
+  font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.04em;transition:all .15s;white-space:nowrap}
+.panel-dl-btn svg{width:12px;height:12px;stroke:currentColor;flex-shrink:0}
+.panel-dl-btn:hover{background:var(--white);border-color:var(--blue-el);color:var(--blue-el);
+  box-shadow:0 1px 4px rgba(43,95,232,.12)}
+
 /* Charts */
 .chart-wrap{position:relative;height:180px}
 .chart-wrap-sm{position:relative;height:160px}

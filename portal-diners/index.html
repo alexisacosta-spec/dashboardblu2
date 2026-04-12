@@ -179,22 +179,22 @@
   </div>
   <div class="row row-3-1">
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Horas por mes</div><div style="display:flex;align-items:center;gap:6px"><div class="panel-badge" id="badge-mes-range">—</div><span class="info-btn" onmouseenter="showTooltip('horas-mes',this)" onmouseleave="hideTooltip()">i</span></div></div>
+      <div class="panel-hdr"><div class="panel-title">Horas por mes</div><div style="display:flex;align-items:center;gap:8px"><div class="panel-badge" id="badge-mes-range">—</div><span class="info-btn" onmouseenter="showTooltip('horas-mes',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="downloadChart('chart-mes','horas-por-mes')" title="Descargar PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> PNG</button><button class="panel-dl-btn" onclick="exportMesExcel()" title="Descargar Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Excel</button></div></div>
       <div class="panel-body"><div class="chart-wrap"><canvas id="chart-mes"></canvas></div></div>
     </div>
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Por empresa</div><span class="info-btn" onmouseenter="showTooltip('empresa-donut',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-hdr"><div class="panel-title">Por empresa</div><div style="display:flex;align-items:center;gap:8px"><span class="info-btn" onmouseenter="showTooltip('empresa-donut',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="downloadChart('chart-emp-donut','distribucion-empresa')" title="Descargar PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> PNG</button></div></div>
       <div class="panel-body"><div class="chart-wrap-sm"><canvas id="chart-emp-donut"></canvas></div>
       <div id="emp-legend" style="margin-top:8px"></div></div>
     </div>
   </div>
   <div class="row row-2">
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Top iniciativas</div><div style="display:flex;align-items:center;gap:6px"><div class="panel-badge" onclick="showView('iniciativas')" style="cursor:pointer">Ver todas →</div><span class="info-btn" onmouseenter="showTooltip('top-ini',this)" onmouseleave="hideTooltip()">i</span></div></div>
+      <div class="panel-hdr"><div class="panel-title">Top iniciativas</div><div style="display:flex;align-items:center;gap:8px"><div class="panel-badge" onclick="showView('iniciativas')" style="cursor:pointer">Ver todas →</div><span class="info-btn" onmouseenter="showTooltip('top-ini',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="exportTopIniExcel()" title="Descargar Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Excel</button></div></div>
       <div class="panel-body" id="pbar-iniciativas"><div class="loader">Cargando…</div></div>
     </div>
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Horas por rol</div><span class="info-btn" onmouseenter="showTooltip('horas-rol',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-hdr"><div class="panel-title">Horas por rol</div><div style="display:flex;align-items:center;gap:8px"><span class="info-btn" onmouseenter="showTooltip('horas-rol',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="exportRolesExcel()" title="Descargar Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Excel</button></div></div>
       <div class="panel-body" id="pbar-roles"><div class="loader">Cargando…</div></div>
     </div>
   </div>
@@ -214,16 +214,16 @@
   <div class="topbar"><div><div class="page-title">Por empresa</div><div class="page-sub">Composición y esfuerzo por proveedor</div></div></div>
   <div class="row row-2">
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Horas por empresa</div><span class="info-btn" onmouseenter="showTooltip('horas-emp-bar',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-hdr"><div class="panel-title">Horas por empresa</div><div style="display:flex;align-items:center;gap:8px"><span class="info-btn" onmouseenter="showTooltip('horas-emp-bar',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="downloadChart('chart-emp-bar','horas-por-empresa')" title="Descargar PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> PNG</button></div></div>
       <div class="panel-body"><div class="chart-wrap"><canvas id="chart-emp-bar"></canvas></div></div>
     </div>
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Matriz empresa × rol</div><div style="display:flex;align-items:center;gap:6px"><div class="panel-badge">Horas</div><span class="info-btn" onmouseenter="showTooltip('matriz-emp-rol',this)" onmouseleave="hideTooltip()">i</span></div></div>
+      <div class="panel-hdr"><div class="panel-title">Matriz empresa × rol</div><div style="display:flex;align-items:center;gap:8px"><div class="panel-badge">Horas</div><span class="info-btn" onmouseenter="showTooltip('matriz-emp-rol',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="exportHeatmapExcel()" title="Descargar Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Excel</button></div></div>
       <div class="panel-body heatmap" id="heatmap-content"><div class="loader">Cargando…</div></div>
     </div>
   </div>
   <div class="panel">
-    <div class="panel-hdr"><div class="panel-title">Detalle por empresa</div><span class="info-btn" onmouseenter="showTooltip('detalle-emp',this)" onmouseleave="hideTooltip()">i</span></div>
+    <div class="panel-hdr"><div class="panel-title">Detalle por empresa</div><div style="display:flex;align-items:center;gap:8px"><span class="info-btn" onmouseenter="showTooltip('detalle-emp',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="exportEmpresaExcel()" title="Descargar Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Excel</button></div></div>
     <div class="panel-body"><div id="emp-table-wrap"><div class="loader">Cargando…</div></div></div>
   </div>
 </div>
@@ -257,11 +257,11 @@
   <div class="topbar"><div><div class="page-title">Por categoría de negocio</div><div class="page-sub">Distribución del esfuerzo por línea de negocio</div></div></div>
   <div class="row row-2">
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Horas por categoría</div><span class="info-btn" onmouseenter="showTooltip('cat-donut',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-hdr"><div class="panel-title">Horas por categoría</div><div style="display:flex;align-items:center;gap:8px"><span class="info-btn" onmouseenter="showTooltip('cat-donut',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="downloadChart('chart-cat','horas-por-categoria')" title="Descargar PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> PNG</button></div></div>
       <div class="panel-body"><div class="chart-wrap"><canvas id="chart-cat"></canvas></div></div>
     </div>
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Detalle por categoría</div><span class="info-btn" onmouseenter="showTooltip('cat-detalle',this)" onmouseleave="hideTooltip()">i</span></div>
+      <div class="panel-hdr"><div class="panel-title">Detalle por categoría</div><div style="display:flex;align-items:center;gap:8px"><span class="info-btn" onmouseenter="showTooltip('cat-detalle',this)" onmouseleave="hideTooltip()">i</span><button class="panel-dl-btn" onclick="exportCatExcel()" title="Descargar Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Excel</button></div></div>
       <div class="panel-body" id="cat-detail"><div class="loader">Cargando…</div></div>
     </div>
   </div>
@@ -304,7 +304,7 @@
   <div class="panel">
     <div class="panel-hdr">
       <div style="display:flex;align-items:center"><div class="panel-title">% Avance por iniciativa</div><span class="info-btn" onmouseenter="showTooltip('avance-ini',this)" onmouseleave="hideTooltip()">i</span></div>
-      <div class="panel-badge">Tasks cerradas / tasks planificadas</div>
+      <div style="display:flex;align-items:center;gap:8px"><div class="panel-badge">Tasks cerradas / tasks planificadas</div><button class="panel-dl-btn" onclick="exportAvanceExcel()" title="Descargar Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Excel</button></div>
     </div>
     <div class="panel-body" id="avance-ini-content"><div class="loader">Cargando…</div></div>
   </div>
@@ -349,14 +349,14 @@
     <div class="panel">
       <div class="panel-hdr">
         <div class="panel-title">Distribución por rango</div>
-        <div class="panel-badge">Nº de iniciativas por duración</div>
+        <div style="display:flex;align-items:center;gap:8px"><div class="panel-badge">Nº de iniciativas por duración</div><button class="panel-dl-btn" onclick="downloadChart('chart-lt-dist','lead-time-distribucion')" title="Descargar PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> PNG</button></div>
       </div>
       <div class="panel-body"><div class="chart-wrap" id="lt-chart-dist-wrap"><canvas id="chart-lt-dist"></canvas></div></div>
     </div>
     <div class="panel">
       <div class="panel-hdr">
         <div class="panel-title">Top iniciativas por Lead Time</div>
-        <div class="panel-badge">Máx. 12 · ordenadas desc.</div>
+        <div style="display:flex;align-items:center;gap:8px"><div class="panel-badge">Máx. 12 · ordenadas desc.</div><button class="panel-dl-btn" onclick="downloadChart('chart-lt-bar','lead-time-top-iniciativas')" title="Descargar PNG"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> PNG</button></div>
       </div>
       <div class="panel-body"><div id="lt-chart-bar-wrap" style="position:relative;height:180px"><canvas id="chart-lt-bar"></canvas></div></div>
     </div>
@@ -366,7 +366,7 @@
   <div class="panel">
     <div class="panel-hdr">
       <div class="panel-title">Detalle por iniciativa</div>
-      <div class="panel-badge" id="lt-badge-tabla">—</div>
+      <div style="display:flex;align-items:center;gap:8px"><div class="panel-badge" id="lt-badge-tabla">—</div><button class="panel-dl-btn" onclick="exportLTExcel()" title="Descargar Excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Excel</button></div>
     </div>
     <div class="panel-body" id="lt-tabla-content"><div class="loader">Cargando…</div></div>
   </div>

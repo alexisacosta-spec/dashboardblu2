@@ -346,6 +346,11 @@ async function loadResumen() {
         <span style="font-size:10px;color:var(--muted);margin-left:auto">${fmtH(dataE[i])} h · ${Math.round(dataE[i]/totalEmp*100)}%</span>
       </div>`).join('');
 
+    // Caché para exportación
+    _cacheResumen.mes    = mes.map(r=>({label:`${MESES[r.mes]||r.mes} ${r.anio}`, horas:r.horas}));
+    _cacheResumen.roles  = roles.map(r=>({label:r.rol, horas:r.horas}));
+    _cacheResumen.topIni = ini.slice(0,8).map(r=>({label:r.nombre_iniciativa, horas:r.horas}));
+
     // Pbar iniciativas (top 8)
     document.getElementById('pbar-iniciativas').innerHTML = renderPbars(ini.slice(0,8), 'horas');
     // Pbar roles
@@ -396,11 +401,14 @@ function renderIniciativasTable(rows) {
       <div class="panel" id="ini-table-panel">
         <div class="panel-hdr">
           <div style="display:flex;align-items:center"><div class="panel-title">Iniciativas</div>${infoBtn('ini-tabla')}</div>
-          <div class="search-wrap">
-            <input type="text" id="ini-search" class="search-input"
-              placeholder="Buscar por nombre, ID o categoría…"
-              oninput="filterIniciativas()">
-            <span class="search-count" id="ini-search-count"></span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="search-wrap">
+              <input type="text" id="ini-search" class="search-input"
+                placeholder="Buscar por nombre, ID o categoría…"
+                oninput="filterIniciativas()">
+              <span class="search-count" id="ini-search-count"></span>
+            </div>
+            <button class="panel-dl-btn" onclick="exportIniExcel()" title="Descargar Excel">${_icoXls()} Excel</button>
           </div>
         </div>
         <div class="panel-body" style="overflow-x:auto">
@@ -607,6 +615,7 @@ async function loadAvance() {
     let qs = '';
     if (desde && hasta) qs = `?desde=${desde}&hasta=${hasta}`;
     const avance = await api('/api/datos/avance-iniciativas' + qs);
+    _cacheAvance = avance;
     renderAvanceKpis(avance);
     renderAvanceTabla(avance);
     renderDeliveryPlan(avance, desde || null, hasta || null);
@@ -823,6 +832,7 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
 async function loadEmpresas() {
   const q = getFilters();
   const [emp, heatmap] = await Promise.all([api('/api/datos/por-empresa'+q), api('/api/datos/empresa-rol'+q)]);
+  _cacheEmpresas = { emp, heatmap };
   const verCostos = ['admin','gerente'].includes(USER.perfil);
 
   // Chart barras
@@ -867,6 +877,7 @@ async function loadEmpresas() {
 async function loadPersonas() {
   const q = getFilters();
   allPersonas = await api('/api/datos/por-persona'+q);
+  _cachePersonas = allPersonas;
   const verCostos = ['admin','gerente'].includes(USER.perfil);
   document.getElementById('personas-sub').textContent = `${allPersonas.length} colaboradores`;
   if (!verCostos) document.getElementById('th-costo-per').style.display = 'none';
@@ -986,6 +997,7 @@ async function exportPersonasExcel() {
 async function loadCategorias() {
   const q = getFilters();
   const rows = await api('/api/datos/por-categoria'+q);
+  _cacheCategorias = rows;
   const verCostos = ['admin','gerente'].includes(USER.perfil);
   const total = rows.reduce((s,r)=>s+r.horas,0);
   const cols = ['#0A1628','#6B7280','#B4B2A9','#D3D1C7','#1a3060'];
@@ -1575,6 +1587,89 @@ function sessionExpired() {
 function fmtH(n) { return (Math.round((n||0)*10)/10).toLocaleString('es-EC',{minimumFractionDigits:1,maximumFractionDigits:1}); }
 function fmtN(n) { return Math.round(n||0).toLocaleString('es-EC'); }
 function esc(s) { return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+// ─── DESCARGA UNIVERSAL ───────────────────────────────────────────────────────
+// Ícono PNG para botón de gráfica
+function _icoImg() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+}
+// Ícono Excel para botón de tabla
+function _icoXls() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`;
+}
+
+// Genera el HTML de un grupo de botones de descarga para poner en panel-hdr
+// tipos: [{ tipo:'img', canvasId, filename } | { tipo:'xls', tableId, filename, dataFn }]
+function dlBtns(...acciones) {
+  return `<div class="panel-dl-group">${acciones.map(a => {
+    if (a.tipo === 'img')
+      return `<button class="panel-dl-btn" onclick="downloadChart('${a.canvasId}','${a.filename}')" title="Descargar imagen PNG">${_icoImg()} PNG</button>`;
+    if (a.tipo === 'xls' && a.tableId)
+      return `<button class="panel-dl-btn" onclick="exportTableExcel('${a.tableId}','${a.filename}')" title="Descargar Excel">${_icoXls()} Excel</button>`;
+    if (a.tipo === 'xls' && a.dataFn)
+      return `<button class="panel-dl-btn" onclick="${a.dataFn}()" title="Descargar Excel">${_icoXls()} Excel</button>`;
+    return '';
+  }).join('')}</div>`;
+}
+
+// Descarga cualquier canvas Chart.js como PNG
+function downloadChart(canvasId, filename) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) { toast('Gráfica no disponible', 'err'); return; }
+  // Fondo blanco (Chart.js usa fondo transparente por defecto)
+  const off = document.createElement('canvas');
+  off.width = canvas.width; off.height = canvas.height;
+  const ctx = off.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, off.width, off.height);
+  ctx.drawImage(canvas, 0, 0);
+  const link = document.createElement('a');
+  link.download = filename + '.png';
+  link.href = off.toDataURL('image/png');
+  link.click();
+  toast('Imagen descargada');
+}
+
+// Descarga un <table> HTML como Excel usando SheetJS
+function exportTableExcel(tableId, filename) {
+  let el = document.getElementById(tableId);
+  // Si el contenedor no es la tabla directamente, buscar dentro
+  if (el && el.tagName !== 'TABLE') el = el.querySelector('table');
+  if (!el) { toast('Tabla no disponible', 'err'); return; }
+  const wb = XLSX.utils.table_to_book(el, { sheet: 'Datos', raw: false });
+  XLSX.writeFile(wb, filename + '.xlsx');
+  toast('Excel descargado');
+}
+
+// Descarga datos arbitrarios (array de objetos) como Excel
+function exportDataExcel(rows, sheetName, filename) {
+  if (!rows || !rows.length) { toast('Sin datos para exportar', 'err'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename + '.xlsx');
+  toast('Excel descargado');
+}
+
+// ── Cachés para exportación ───────────────────────────────────────────────────
+let _cacheResumen = { mes:[], roles:[], topIni:[] };
+let _cacheEmpresas = { emp:[], heatmap:[] };
+let _cacheCategorias = [];
+let _cacheAvance = [];
+let _cachePersonas = [];     // alias de allPersonas
+let _cacheIni = [];          // iniciativas actuales en vista
+
+// ── Funciones de exportación por sección ─────────────────────────────────────
+function exportMesExcel()    { exportDataExcel(_cacheResumen.mes.map(r=>({'Mes':r.label,'Horas':r.horas})), 'Horas por mes', 'horas-por-mes'); }
+function exportRolesExcel()  { exportDataExcel(_cacheResumen.roles.map(r=>({'Rol':r.label,'Horas':r.horas})), 'Por rol', 'horas-por-rol'); }
+function exportTopIniExcel() { exportDataExcel(_cacheResumen.topIni.map(r=>({'Iniciativa':r.label,'Horas':r.horas})), 'Top iniciativas', 'top-iniciativas'); }
+function exportCatExcel()    { exportDataExcel(_cacheCategorias.map(r=>({'Categoría':r.categoria_negocio,'Horas':r.horas,'Costo':r.costo})), 'Categorías', 'horas-por-categoria'); }
+function exportAvanceExcel() { exportDataExcel(_cacheAvance.map(r=>({'Iniciativa':r.nombre,'Categoría':r.categoria,'Tasks cerradas':r.cerradas,'Tasks activas':r.activas,'Tasks nuevas':r.nuevas,'Total tasks':r.total,'% Avance':r.pct,'Fecha inicio':r.fecha_ini,'Fecha fin':r.fecha_fin})), 'Avance', 'avance-iniciativas'); }
+function exportPersonasExcel(){ exportTableExcel('personas-content', 'equipo-horas'); }
+function exportEmpresaExcel(){ exportTableExcel('emp-table-wrap', 'horas-por-empresa'); }
+function exportHeatmapExcel(){ exportTableExcel('heatmap-content', 'matriz-empresa-rol'); }
+function exportLTExcel()     { exportTableExcel('lt-tabla-content', 'lead-time-iniciativas'); }
+function exportIniExcel()    { exportTableExcel('ini-content', 'detalle-iniciativas'); }
 
 // ─── INDICADORES ─────────────────────────────────────────────────────────────
 let _ltData = null;
