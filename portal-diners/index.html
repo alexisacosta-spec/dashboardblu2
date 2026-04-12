@@ -108,6 +108,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       Avance y delivery
     </div>
+    <div class="nav-item" onclick="showView('indicadores')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+      Indicadores
+    </div>
     <div class="nav-item" onclick="showView('empresas')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
       Por empresa
@@ -312,6 +316,59 @@
       <div class="panel-badge">Fecha inicio primera task → fecha fin última task</div>
     </div>
     <div class="panel-body" id="delivery-content"><div class="loader">Cargando…</div></div>
+  </div>
+</div>
+
+<!-- ── VIEW: INDICADORES ── -->
+<div class="view" id="view-indicadores">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Indicadores</div>
+      <div class="page-sub">Métricas de proceso · Lead Time por iniciativa</div>
+    </div>
+    <div class="ind-filter-bar">
+      <input type="text" id="lt-search" class="ind-search-input" placeholder="Buscar iniciativa…" oninput="applyLTFiltro()">
+      <select id="lt-cat" class="filter-sel" onchange="applyLTFiltro()">
+        <option value="">Todas las categorías</option>
+      </select>
+      <span class="ind-counter" id="lt-counter"></span>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid" style="grid-template-columns:repeat(5,minmax(0,1fr))">
+    <div class="kpi"><div class="kpi-label">Iniciativas</div><div class="kpi-val" id="lt-kpi-total">—</div><div class="kpi-sub">con fechas registradas</div></div>
+    <div class="kpi"><div class="kpi-label">LT Promedio</div><div class="kpi-val" id="lt-kpi-prom">—</div><div class="kpi-sub">días por iniciativa</div></div>
+    <div class="kpi"><div class="kpi-label">LT Mediana</div><div class="kpi-val" id="lt-kpi-med">—</div><div class="kpi-sub">valor central</div></div>
+    <div class="kpi"><div class="kpi-label">LT Mínimo</div><div class="kpi-val" id="lt-kpi-min">—</div><div class="kpi-sub">iniciativa más corta</div></div>
+    <div class="kpi"><div class="kpi-label">LT Máximo</div><div class="kpi-val" id="lt-kpi-max">—</div><div class="kpi-sub">iniciativa más larga</div></div>
+  </div>
+
+  <!-- Gráficos -->
+  <div class="row row-2" style="margin-bottom:14px">
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-title">Distribución por rango</div>
+        <div class="panel-badge">Nº de iniciativas por duración</div>
+      </div>
+      <div class="panel-body"><div class="chart-wrap" id="lt-chart-dist-wrap"><canvas id="chart-lt-dist"></canvas></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-title">Top iniciativas por Lead Time</div>
+        <div class="panel-badge">Máx. 12 · ordenadas desc.</div>
+      </div>
+      <div class="panel-body"><div id="lt-chart-bar-wrap" style="position:relative;height:180px"><canvas id="chart-lt-bar"></canvas></div></div>
+    </div>
+  </div>
+
+  <!-- Tabla completa -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title">Detalle por iniciativa</div>
+      <div class="panel-badge" id="lt-badge-tabla">—</div>
+    </div>
+    <div class="panel-body" id="lt-tabla-content"><div class="loader">Cargando…</div></div>
   </div>
 </div>
 

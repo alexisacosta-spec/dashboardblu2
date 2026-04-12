@@ -271,7 +271,7 @@ function applyFilters() {
 
 // ─── VIEWS ───────────────────────────────────────────────────────────────────
 // Vistas que NO usan filtros globales — se oculta la barra al entrar
-const VISTAS_SIN_FILTROS = new Set(['avance','equipo','tarifas','usuarios','historial','cargar','logs']);
+const VISTAS_SIN_FILTROS = new Set(['avance','indicadores','equipo','tarifas','usuarios','historial','cargar','logs']);
 
 function showView(name) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
@@ -289,6 +289,7 @@ function showView(name) {
 function renderView(name) {
   const map = {resumen:loadResumen,iniciativas:loadIniciativas,empresas:loadEmpresas,
     personas:loadPersonas,categorias:loadCategorias,avance:loadAvance,
+    indicadores:loadIndicadores,
     usuarios:loadUsuarios,equipo:loadEquipo,tarifas:loadTarifas,
     cargar:()=>{},historial:loadHistorialCSV,logs:loadLogs};
   if (map[name]) map[name]();
@@ -1084,6 +1085,7 @@ function handleDrop(e) {
 
 async function uploadCSV(file) {
   const status = document.getElementById('upload-status');
+  status.style.display = '';
   status.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:12px">⏳ Procesando CSV… esto puede tomar unos segundos</div>';
   const fd = new FormData();
   fd.append('archivo', file);
@@ -1091,8 +1093,13 @@ async function uploadCSV(file) {
     const r = await fetch('/api/admin/cargar-csv', {
       method:'POST', headers:{'Authorization':'Bearer '+TOKEN}, body:fd
     });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error);
+    if (r.status === 401) { sessionExpired(); return; }
+    // Capturar cuerpo como texto primero para evitar error si no es JSON
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch { throw new Error(`Respuesta inesperada del servidor (${r.status}): ${text.slice(0,200)}`); }
+    if (!r.ok) throw new Error(data.error || `Error ${r.status}`);
 
     let html = `<div style="font-size:13px;padding:12px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:8px;color:var(--success)">
       ✅ <strong>CSV procesado correctamente</strong><br>
@@ -1116,7 +1123,8 @@ async function uploadCSV(file) {
     await loadFiltros();
   } catch(e) {
     status.innerHTML = `<div style="font-size:13px;color:var(--error);padding:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px">
-      ❌ Error: ${e.message}
+      ❌ <strong>Error al procesar el CSV</strong><br>
+      <span style="font-size:12px;margin-top:4px;display:block">${e.message}</span>
     </div>`;
     toast('Error al procesar el CSV', 'err');
   }
@@ -1543,14 +1551,244 @@ async function api(url, method='GET', body=null) {
   if (TOKEN) opts.headers['Authorization'] = 'Bearer '+TOKEN;
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(url, opts);
+  if (r.status === 401) { sessionExpired(); return; }
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || 'Error del servidor');
   return data;
 }
 
+function sessionExpired() {
+  localStorage.removeItem('dc_token');
+  localStorage.removeItem('dc_user');
+  TOKEN = null; USER = null;
+  // Mostrar mensaje en pantalla de login
+  showScreen('login');
+  setTimeout(() => {
+    const err = document.getElementById('l-err');
+    if (err) {
+      err.textContent = 'Tu sesión ha expirado. Por favor inicia sesión nuevamente.';
+      err.classList.add('show');
+    }
+  }, 50);
+}
+
 function fmtH(n) { return (Math.round((n||0)*10)/10).toLocaleString('es-EC',{minimumFractionDigits:1,maximumFractionDigits:1}); }
 function fmtN(n) { return Math.round(n||0).toLocaleString('es-EC'); }
 function esc(s) { return (s||'').replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+// ─── INDICADORES ─────────────────────────────────────────────────────────────
+let _ltData = null;
+let chartLTDist = null, chartLTBar = null;
+
+async function loadIndicadores() {
+  document.getElementById('lt-tabla-content').innerHTML        = '<div class="loader">Cargando…</div>';
+  document.getElementById('lt-chart-dist-wrap').innerHTML      = '<div class="loader">Cargando…</div>';
+  document.getElementById('lt-chart-bar-wrap').innerHTML       = '<div class="loader">Cargando…</div>';
+  document.getElementById('lt-kpi-total').textContent          = '—';
+  document.getElementById('lt-kpi-prom').textContent           = '—';
+  document.getElementById('lt-kpi-med').textContent            = '—';
+  document.getElementById('lt-kpi-min').textContent            = '—';
+  document.getElementById('lt-kpi-max').textContent            = '—';
+  try {
+    _ltData = await api('/api/indicadores/lead-time');
+    if (!_ltData.iniciativas.length) {
+      ['lt-tabla-content','lt-chart-dist-wrap','lt-chart-bar-wrap'].forEach(id => {
+        document.getElementById(id).innerHTML =
+          '<div class="no-data">Sin datos de iniciativas<div class="no-data-action">Carga el Excel para ver los indicadores.</div></div>';
+      });
+      return;
+    }
+    renderLTKpis(_ltData.kpis);
+    // Poblar select de categorías
+    const cats = [...new Set(_ltData.iniciativas.map(r => r.categoria))].sort();
+    const sel  = document.getElementById('lt-cat');
+    sel.innerHTML = '<option value="">Todas las categorías</option>' +
+      cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    applyLTFiltro();
+  } catch(e) {
+    ['lt-tabla-content','lt-chart-dist-wrap','lt-chart-bar-wrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = `<div class="no-data">Error al cargar: ${e.message}</div>`;
+    });
+  }
+}
+
+function renderLTKpis(kpis) {
+  document.getElementById('lt-kpi-total').textContent = kpis.total;
+  document.getElementById('lt-kpi-prom').textContent  = kpis.promedio + 'd';
+  document.getElementById('lt-kpi-med').textContent   = kpis.mediana  + 'd';
+  document.getElementById('lt-kpi-min').textContent   = kpis.minimo   + 'd';
+  document.getElementById('lt-kpi-max').textContent   = kpis.maximo   + 'd';
+}
+
+function calcLTKpis(iniciativas) {
+  const lts = iniciativas.map(r => r.lead_time).sort((a, b) => a - b);
+  const n   = lts.length;
+  return {
+    total:    n,
+    promedio: n > 0 ? Math.round(lts.reduce((s, v) => s + v, 0) / n) : 0,
+    mediana:  n > 0 ? (n % 2 === 0 ? Math.round((lts[n/2-1] + lts[n/2]) / 2) : lts[Math.floor(n/2)]) : 0,
+    minimo:   n > 0 ? lts[0]     : 0,
+    maximo:   n > 0 ? lts[n - 1] : 0
+  };
+}
+
+function applyLTFiltro() {
+  if (!_ltData) return;
+  const texto = (document.getElementById('lt-search')?.value || '').toLowerCase().trim();
+  const cat   =  document.getElementById('lt-cat')?.value   || '';
+
+  let filtradas = _ltData.iniciativas;
+  if (texto) filtradas = filtradas.filter(r => r.nombre.toLowerCase().includes(texto));
+  if (cat)   filtradas = filtradas.filter(r => r.categoria === cat);
+
+  const total = _ltData.iniciativas.length;
+  document.getElementById('lt-counter').textContent =
+    filtradas.length === total ? `${total} iniciativas` : `${filtradas.length} de ${total}`;
+  document.getElementById('lt-badge-tabla').textContent =
+    `${filtradas.length} iniciativa${filtradas.length !== 1 ? 's' : ''}`;
+
+  // Recalcular KPIs sobre el subconjunto filtrado
+  renderLTKpis(calcLTKpis(filtradas));
+
+  // La distribución se recalcula también sobre el subconjunto filtrado
+  const distFiltrada = { '0–30d': 0, '31–60d': 0, '61–90d': 0, '91–180d': 0, '180+d': 0 };
+  for (const r of filtradas) {
+    if      (r.lead_time <= 30)  distFiltrada['0–30d']++;
+    else if (r.lead_time <= 60)  distFiltrada['31–60d']++;
+    else if (r.lead_time <= 90)  distFiltrada['61–90d']++;
+    else if (r.lead_time <= 180) distFiltrada['91–180d']++;
+    else                         distFiltrada['180+d']++;
+  }
+  renderLTChartDist(distFiltrada);
+  renderLTChartBar(filtradas);
+  renderLTTabla(filtradas);
+}
+
+function ltColor(lt) {
+  if (lt > 120) return '#8C2A2A';
+  if (lt > 60)  return '#8C6A1A';
+  if (lt > 30)  return '#3B5EA6';
+  return '#2D7A4F';
+}
+
+function renderLTChartDist(dist) {
+  const wrap = document.getElementById('lt-chart-dist-wrap');
+  wrap.innerHTML = '<canvas id="chart-lt-dist"></canvas>';
+  const ctx = document.getElementById('chart-lt-dist');
+  if (chartLTDist) { chartLTDist.destroy(); chartLTDist = null; }
+  const labels = Object.keys(dist);
+  const values = Object.values(dist);
+  const colors = ['#2D7A4F','#3B5EA6','#8C6A1A','#C05B2D','#8C2A2A'];
+  chartLTDist = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors,
+      borderRadius: 5, borderSkipped: false }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: c => ` ${c.raw} iniciativa${c.raw !== 1 ? 's' : ''}` } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#EBF0FA' }, ticks: { stepSize: 1, font: { size: 10 } },
+          beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderLTChartBar(iniciativas) {
+  const wrap = document.getElementById('lt-chart-bar-wrap');
+  if (!iniciativas.length) {
+    wrap.innerHTML = '<div class="no-data" style="height:180px;display:flex;align-items:center;justify-content:center">Sin resultados para el filtro</div>';
+    if (chartLTBar) { chartLTBar.destroy(); chartLTBar = null; }
+    return;
+  }
+  wrap.innerHTML = '<canvas id="chart-lt-bar"></canvas>';
+  const ctx = document.getElementById('chart-lt-bar');
+  if (chartLTBar) { chartLTBar.destroy(); chartLTBar = null; }
+  const top = [...iniciativas].sort((a, b) => b.lead_time - a.lead_time).slice(0, 12);
+  chartLTBar = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(r => r.nombre.length > 30 ? r.nombre.slice(0, 30) + '…' : r.nombre),
+      datasets: [{ data: top.map(r => r.lead_time),
+        backgroundColor: top.map(r => ltColor(r.lead_time)),
+        borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: {
+          title: (items) => top[items[0].dataIndex].nombre,
+          label: c => ` ${c.raw}d de lead time`
+        } } },
+      scales: {
+        x: { grid: { color: '#EBF0FA' }, ticks: { font: { size: 10 },
+          callback: v => v + 'd' } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderLTTabla(iniciativas) {
+  const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  function fmtFecha(s) {
+    if (!s) return '—';
+    const d = new Date(s + 'T12:00:00');
+    return `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  const sorted = [...iniciativas].sort((a, b) => b.lead_time - a.lead_time);
+  if (!sorted.length) {
+    document.getElementById('lt-tabla-content').innerHTML =
+      '<div class="no-data">Sin iniciativas que coincidan con el filtro</div>';
+    return;
+  }
+
+  const rows = sorted.map((r, i) => {
+    const col = ltColor(r.lead_time);
+    const pbarColor = r.pct >= 100 ? '#3B5EA6' : r.pct >= 70 ? '#2D7A4F' : '#8C6A1A';
+    return `<tr>
+      <td class="muted" style="font-size:10px;width:24px;text-align:center">${i + 1}</td>
+      <td>
+        <div style="font-weight:600;font-size:12px;color:var(--text);line-height:1.3">${r.nombre}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${r.categoria}</div>
+      </td>
+      <td class="muted" style="white-space:nowrap">${fmtFecha(r.fecha_ini)}</td>
+      <td class="muted" style="white-space:nowrap">${fmtFecha(r.fecha_fin)}</td>
+      <td style="white-space:nowrap">
+        <span style="background:${col}18;color:${col};border:1px solid ${col}44;
+          font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">
+          ${r.lead_time}d
+        </span>
+      </td>
+      <td style="min-width:120px">
+        <div style="display:flex;align-items:center;gap:7px">
+          <div class="lt-pbar-track"><div class="lt-pbar-fill"
+            style="width:${r.pct}%;background:${pbarColor}"></div></div>
+          <span style="font-size:11px;font-weight:700;color:var(--text2);min-width:36px;text-align:right">${r.pct}%</span>
+        </div>
+      </td>
+      <td class="muted" style="text-align:right;white-space:nowrap">${r.cerradas} / ${r.total}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('lt-tabla-content').innerHTML = `
+    <table class="tbl">
+      <thead><tr>
+        <th>#</th>
+        <th>Iniciativa</th>
+        <th>Fecha inicio</th>
+        <th>Fecha fin</th>
+        <th>Lead Time</th>
+        <th>Avance</th>
+        <th style="text-align:right">Tasks</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
 
 window.onclick = e => {
   document.querySelectorAll('.modal-overlay.show').forEach(m => {

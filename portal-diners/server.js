@@ -774,6 +774,58 @@ app.get('/api/datos/avance-iniciativas', authMiddleware, (req,res) => {
   })));
 });
 
+// ─── INDICADORES ─────────────────────────────────────────────────────────────
+app.get('/api/indicadores/lead-time', authMiddleware, (req, res) => {
+  const rows = db.all(`
+    SELECT id_iniciativa, nombre_iniciativa, categoria_negocio,
+           total_tasks, cerradas, activas, nuevas, fecha_ini, fecha_fin
+    FROM tasks_plan
+    WHERE id_iniciativa NOT IN ('SIN_INI','SIN PARENT','')
+      AND fecha_ini IS NOT NULL AND fecha_fin IS NOT NULL
+      AND fecha_ini != '' AND fecha_fin != ''
+    ORDER BY nombre_iniciativa
+  `);
+
+  const iniciativas = rows.map(r => {
+    const ini = new Date(r.fecha_ini);
+    const fin = new Date(r.fecha_fin);
+    const lt  = Math.max(0, Math.round((fin - ini) / 86400000));
+    return {
+      id:        r.id_iniciativa,
+      nombre:    r.nombre_iniciativa,
+      categoria: r.categoria_negocio || 'Sin Clasificar',
+      fecha_ini: r.fecha_ini,
+      fecha_fin: r.fecha_fin,
+      lead_time: lt,
+      pct:       r.total_tasks > 0 ? Math.round(r.cerradas / r.total_tasks * 1000) / 10 : 0,
+      cerradas:  r.cerradas  || 0,
+      total:     r.total_tasks || 0
+    };
+  });
+
+  // KPIs globales
+  const lts = iniciativas.map(r => r.lead_time).sort((a, b) => a - b);
+  const n   = lts.length;
+  const promedio = n > 0 ? Math.round(lts.reduce((s, v) => s + v, 0) / n) : 0;
+  const mediana  = n > 0
+    ? (n % 2 === 0 ? Math.round((lts[n/2-1] + lts[n/2]) / 2) : lts[Math.floor(n/2)])
+    : 0;
+  const minimo = n > 0 ? lts[0]     : 0;
+  const maximo = n > 0 ? lts[n - 1] : 0;
+
+  // Distribución por rangos
+  const distribucion = { '0–30d': 0, '31–60d': 0, '61–90d': 0, '91–180d': 0, '180+d': 0 };
+  for (const lt of lts) {
+    if      (lt <= 30)  distribucion['0–30d']++;
+    else if (lt <= 60)  distribucion['31–60d']++;
+    else if (lt <= 90)  distribucion['61–90d']++;
+    else if (lt <= 180) distribucion['91–180d']++;
+    else                distribucion['180+d']++;
+  }
+
+  res.json({ iniciativas, kpis: { promedio, mediana, minimo, maximo, total: n }, distribucion });
+});
+
 // ─── HISTORIAL CSV ───────────────────────────────────────────────────────────
 app.get('/api/admin/historial-csv', authMiddleware, adminOnly, (req, res) => {
   // No devolver los snapshots (muy pesados) — solo metadata

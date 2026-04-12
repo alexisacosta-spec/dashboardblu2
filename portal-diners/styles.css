@@ -512,3 +512,17 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 .gantt-day-lbl:last-child{border-right:none}
 .gantt-vline-week{position:absolute;top:0;bottom:0;width:0.5px;background:var(--border)}
 .gantt-vline-month{position:absolute;top:0;bottom:0;width:1px;background:var(--border2)}
+
+/* ── INDICADORES ── */
+.ind-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ind-search-input{padding:7px 12px;border:1.5px solid var(--border2);border-radius:var(--r);
+  font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--text);
+  background:var(--white);outline:none;transition:border-color .15s;min-width:220px}
+.ind-search-input:focus{border-color:var(--blue-el)}
+.ind-counter{font-size:10px;font-weight:700;color:var(--muted);
+  background:var(--surface2);border:1px solid var(--border2);
+  padding:4px 10px;border-radius:20px;white-space:nowrap}
+
+/* Tabla Lead Time */
+.lt-pbar-track{height:5px;background:var(--border);border-radius:3px;min-width:50px;flex:1}
+.lt-pbar-fill{height:5px;border-radius:3px;transition:width .3s}
