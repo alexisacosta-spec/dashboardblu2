@@ -28,18 +28,13 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev_secret_change_me'
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 
 // ─── SEC-08: Headers de seguridad HTTP (Helmet) ───────────────────────────────
+// CSP deshabilitada: el portal usa archivos estáticos con scripts inline (onclick),
+// lo que requiere nonces por request para ser compatible con CSP — complejidad innecesaria
+// para un portal interno. Los demás headers de Helmet sí se aplican:
+// X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy, etc.
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc:  ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"],
-      styleSrc:   ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
-      fontSrc:    ["'self'", "fonts.gstatic.com"],
-      imgSrc:     ["'self'", "data:"],
-      connectSrc: ["'self'"]
-    }
-  },
-  crossOriginEmbedderPolicy: false
+  contentSecurityPolicy:      false,
+  crossOriginEmbedderPolicy:  false
 }));
 
 // ─── SEC-04: Rate limiting en endpoints de autenticación ─────────────────────
@@ -54,6 +49,11 @@ const resendLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minuto
   max: 3,
   message: { error: 'Demasiadas solicitudes de reenvío. Espera un minuto.' }
+});
+const forgotLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 3,
+  message: { error: 'Demasiadas solicitudes de recuperación. Espera una hora.' }
 });
 
 app.use(express.json());
@@ -86,6 +86,15 @@ db.run(`CREATE TABLE IF NOT EXISTS sesiones_log (
 db.run(`CREATE TABLE IF NOT EXISTS token_blocklist (
   jti  TEXT PRIMARY KEY,
   expira INTEGER NOT NULL
+)`);
+// Recuperación de contraseña
+db.run(`CREATE TABLE IF NOT EXISTS password_reset_codes (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id   INTEGER NOT NULL,
+  codigo    TEXT NOT NULL,
+  expira_en TEXT NOT NULL,
+  usado     INTEGER DEFAULT 0,
+  creado_en TEXT DEFAULT (datetime('now'))
 )`);
 // Limpiar tokens expirados al arrancar
 db.run(`DELETE FROM token_blocklist WHERE expira < ${Math.floor(Date.now()/1000)}`);
@@ -195,8 +204,17 @@ async function enviarOTP(email, nombre, codigo) {
   if (DEV_MODE) { console.log(`\n📧 OTP para ${email}: ${codigo}\n`); return; }
   await transporter.sendMail({
     from: process.env.MAIL_FROM, to: email,
-    subject: 'Código de verificación — Portal Gerencial Diners',
-    html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#F2F5FA;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F5FA;padding:32px 0"><tr><td align="center"><table width="520" cellpadding="0" cellspacing="0"><tr><td style="background:#0D1B2E;border-radius:12px 12px 0 0;padding:28px 32px"><div style="font-size:20px;font-weight:800;color:#fff">Diners Club del Ecuador</div><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px">Portal Gerencial · BLU 2.0</div></td></tr><tr><td style="background:#fff;padding:36px 32px"><p style="margin:0 0 8px;font-size:16px;color:#0D1B2E">Hola <strong>${nombre}</strong>,</p><p style="margin:0 0 28px;font-size:14px;color:#5A6E8A">Tu código de verificación es:</p><div style="text-align:center;margin:0 0 28px"><div style="display:inline-block;background:#F2F5FA;border:2px solid #D0DCF0;border-radius:12px;padding:24px 32px;font-size:48px;font-weight:800;letter-spacing:14px;color:#0D1B2E">${codigo}</div></div><div style="background:#2B5FE8;border-radius:8px;padding:12px 20px;text-align:center"><span style="font-size:13px;font-weight:700;color:#fff">⏱ Expira en 5 minutos</span></div></td></tr><tr><td style="background:#0D1B2E;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center"><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3)">Diners Club del Ecuador · Mensaje automático</p></td></tr></table></td></tr></table></body></html>`
+    subject: 'Código de verificación — Portal Canales',
+    html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#F2F5FA;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F5FA;padding:32px 0"><tr><td align="center"><table width="520" cellpadding="0" cellspacing="0"><tr><td style="background:#0D1B2E;border-radius:12px 12px 0 0;padding:28px 32px"><div style="font-size:20px;font-weight:800;color:#fff">Diners Club del Ecuador</div><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px">Portal Canales</div></td></tr><tr><td style="background:#fff;padding:36px 32px"><p style="margin:0 0 8px;font-size:16px;color:#0D1B2E">Hola <strong>${nombre}</strong>,</p><p style="margin:0 0 28px;font-size:14px;color:#5A6E8A">Tu código de verificación es:</p><div style="text-align:center;margin:0 0 28px"><div style="display:inline-block;background:#F2F5FA;border:2px solid #D0DCF0;border-radius:12px;padding:24px 32px;font-size:48px;font-weight:800;letter-spacing:14px;color:#0D1B2E">${codigo}</div></div><div style="background:#2B5FE8;border-radius:8px;padding:12px 20px;text-align:center"><span style="font-size:13px;font-weight:700;color:#fff">⏱ Expira en 5 minutos</span></div></td></tr><tr><td style="background:#0D1B2E;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center"><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3)">Diners Club del Ecuador · Mensaje automático</p></td></tr></table></td></tr></table></body></html>`
+  });
+}
+
+async function enviarResetPassword(email, nombre, codigo) {
+  if (DEV_MODE) { console.log(`\n🔑 RESET PASSWORD para ${email}: ${codigo}\n`); return; }
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM, to: email,
+    subject: 'Restablecimiento de contraseña — Portal Canales',
+    html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#F2F5FA;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F5FA;padding:32px 0"><tr><td align="center"><table width="520" cellpadding="0" cellspacing="0"><tr><td style="background:#0D1B2E;border-radius:12px 12px 0 0;padding:28px 32px"><div style="font-size:20px;font-weight:800;color:#fff">Diners Club del Ecuador</div><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px">Portal Canales · Recuperación de contraseña</div></td></tr><tr><td style="background:#fff;padding:36px 32px"><p style="margin:0 0 8px;font-size:16px;color:#0D1B2E">Hola <strong>${nombre}</strong>,</p><p style="margin:0 0 8px;font-size:14px;color:#5A6E8A">Recibimos una solicitud para restablecer tu contraseña.</p><p style="margin:0 0 28px;font-size:14px;color:#5A6E8A">Usa este código para continuar:</p><div style="text-align:center;margin:0 0 28px"><div style="display:inline-block;background:#F2F5FA;border:2px solid #D0DCF0;border-radius:12px;padding:24px 32px;font-size:48px;font-weight:800;letter-spacing:14px;color:#0D1B2E">${codigo}</div></div><div style="background:#C9A84C;border-radius:8px;padding:12px 20px;text-align:center"><span style="font-size:13px;font-weight:700;color:#0D1B2E">⏱ Expira en 15 minutos</span></div><p style="margin:24px 0 0;font-size:12px;color:#8A9BB0">Si no solicitaste este cambio, ignora este mensaje. Tu contraseña no será modificada.</p></td></tr><tr><td style="background:#0D1B2E;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center"><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3)">Diners Club del Ecuador · Mensaje automático</p></td></tr></table></td></tr></table></body></html>`
   });
 }
 
@@ -306,6 +324,59 @@ app.post('/api/auth/resend-otp', resendLimiter, (req, res) => {
   db.run('INSERT INTO otp_codes (user_id,codigo,expira_en) VALUES (?,?,?)', [user.id,codigo,expira]);
   enviarOTP(user.email, user.nombre, codigo).catch(console.error);
   res.json({ ok:true });
+});
+
+// ─── RECUPERACIÓN DE CONTRASEÑA ───────────────────────────────────────────────
+
+// Paso 1: Solicitar código de reset (siempre responde ok:true para no revelar emails registrados)
+app.post('/api/auth/forgot-password', forgotLimiter, (req, res) => {
+  const email = req.body.email?.toLowerCase().trim();
+  if (!email) return res.status(400).json({ error: 'El correo es requerido' });
+  try {
+    const user = db.get('SELECT * FROM usuarios WHERE email=? AND activo=1', [email]);
+    if (user) {
+      // Invalidar códigos anteriores del mismo usuario
+      db.run('UPDATE password_reset_codes SET usado=1 WHERE user_id=?', [user.id]);
+      const codigo = Math.floor(100000 + Math.random() * 900000).toString();
+      const expira = new Date(Date.now() + 15*60*1000).toISOString().replace('T',' ').split('.')[0];
+      db.run('INSERT INTO password_reset_codes (user_id,codigo,expira_en) VALUES (?,?,?)', [user.id,codigo,expira]);
+      enviarResetPassword(user.email, user.nombre, codigo).catch(e => console.error('Reset email error:',e.message));
+      auditLog(email, 'PASSWORD_RESET_SOLICITADO', null, req.ip);
+    }
+  } catch(e) { console.error('forgot-password error:', e.message); }
+  // Siempre responde igual — nunca revelar si el email existe
+  res.json({ ok: true });
+});
+
+// Paso 2: Validar código y establecer nueva contraseña
+app.post('/api/auth/reset-password', forgotLimiter, (req, res) => {
+  const { email, codigo, nueva_password, confirmar_password } = req.body;
+  if (!email || !codigo || !nueva_password || !confirmar_password)
+    return res.status(400).json({ error: 'Todos los campos son requeridos' });
+  if (nueva_password !== confirmar_password)
+    return res.status(400).json({ error: 'Las contraseñas no coinciden' });
+  // SEC-03: Validar fortaleza de la nueva contraseña
+  const pwError = validatePassword(nueva_password);
+  if (pwError) return res.status(400).json({ error: pwError });
+
+  const user = db.get('SELECT * FROM usuarios WHERE email=? AND activo=1', [email.toLowerCase().trim()]);
+  if (!user) return res.status(400).json({ error: 'Código incorrecto o expirado' });
+
+  const now = new Date().toISOString().replace('T',' ').split('.')[0];
+  const reset = db.get(
+    'SELECT * FROM password_reset_codes WHERE user_id=? AND codigo=? AND usado=0 AND expira_en>? ORDER BY id DESC LIMIT 1',
+    [user.id, codigo, now]
+  );
+  if (!reset) {
+    auditLog(email, 'PASSWORD_RESET_FALLIDO', { razon: 'codigo_invalido' }, req.ip);
+    return res.status(400).json({ error: 'Código incorrecto o expirado' });
+  }
+
+  // Actualizar contraseña e invalidar el código
+  db.run('UPDATE usuarios SET password_hash=? WHERE id=?', [bcrypt.hashSync(nueva_password,10), user.id]);
+  db.run('UPDATE password_reset_codes SET usado=1 WHERE id=?', [reset.id]);
+  auditLog(email, 'PASSWORD_RESET_OK', null, req.ip);
+  res.json({ ok: true });
 });
 
 // ─── ADMIN USUARIOS ───────────────────────────────────────────────────────────
@@ -1075,7 +1146,7 @@ app.listen(PORT, '0.0.0.0', () => {
   const equipo = (db.get('SELECT COUNT(*) as t FROM equipo')||{}).t||0;
   const tarifas = (db.get('SELECT COUNT(*) as t FROM tarifas')||{}).t||0;
   console.log('\n╔══════════════════════════════════════════════╗');
-  console.log('║      PORTAL GERENCIAL DINERS — BLU 2.0       ║');
+  console.log('║         PORTAL CANALES — DINERS CLUB         ║');
   console.log('╠══════════════════════════════════════════════╣');
   console.log(`║  Local:  http://localhost:${PORT}                ║`);
   console.log(`║  Red:    http://${localIP}:${PORT}           ║`);

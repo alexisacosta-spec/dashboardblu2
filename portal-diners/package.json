@@ -1,7 +1,7 @@
 {
   "name": "portal-diners",
   "version": "1.0.0",
-  "description": "Portal Gerencial Diners Club - Reporte de Horas BLU 2.0",
+  "description": "Portal Canales — Diners Club",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

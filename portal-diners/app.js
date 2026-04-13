@@ -64,6 +64,7 @@ function infoBtn(key) {
 let TOKEN = localStorage.getItem('dc_token');
 let USER = JSON.parse(localStorage.getItem('dc_user') || 'null');
 let currentEmail = '';
+let resetEmail = '';
 let otpTimer = null;
 let chartMes = null, chartEmpDonut = null, chartEmpBar = null, chartCat = null;
 let allPersonas = [];
@@ -149,6 +150,77 @@ function doLogout() {
   showScreen('login');
 }
 
+// ─── RECUPERACIÓN DE CONTRASEÑA ──────────────────────────────────────────────
+async function doForgotPassword() {
+  const email = document.getElementById('fp-email').value.trim();
+  const err   = document.getElementById('fp-err');
+  const btn   = document.getElementById('btn-forgot');
+  err.classList.remove('show');
+  if (!email) { err.textContent = 'Ingresa tu correo institucional'; err.classList.add('show'); return; }
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    await api('/api/auth/forgot-password', 'POST', { email });
+    resetEmail = email;
+    document.getElementById('reset-email-show').textContent = email;
+    // Limpiar campos de la pantalla de reset
+    [0,1,2,3,4,5].forEach(i => { const el = document.getElementById('r'+i); if(el) el.value = ''; });
+    document.getElementById('rp-pass1').value = '';
+    document.getElementById('rp-pass2').value = '';
+    document.getElementById('rp-err').classList.remove('show');
+    showScreen('reset');
+    setTimeout(() => { const r0 = document.getElementById('r0'); if(r0) r0.focus(); }, 100);
+  } catch(e) {
+    err.textContent = e.message || 'Error al enviar el código';
+    err.classList.add('show');
+  } finally { btn.disabled = false; btn.textContent = 'Enviar código de recuperación'; }
+}
+
+async function doResetPassword() {
+  const codigo = [0,1,2,3,4,5].map(i => document.getElementById('r'+i).value).join('');
+  const pass1  = document.getElementById('rp-pass1').value;
+  const pass2  = document.getElementById('rp-pass2').value;
+  const err    = document.getElementById('rp-err');
+  const btn    = document.getElementById('btn-reset');
+  err.classList.remove('show');
+
+  if (codigo.length !== 6) { err.textContent = 'Ingresa el código de 6 dígitos'; err.classList.add('show'); return; }
+  if (!pass1 || !pass2)    { err.textContent = 'Completa ambas contraseñas'; err.classList.add('show'); return; }
+  if (pass1 !== pass2)     { err.textContent = 'Las contraseñas no coinciden'; err.classList.add('show'); return; }
+
+  btn.disabled = true; btn.textContent = 'Cambiando contraseña…';
+  try {
+    await api('/api/auth/reset-password', 'POST', {
+      email: resetEmail, codigo,
+      nueva_password: pass1, confirmar_password: pass2
+    });
+    showScreen('login');
+    // Mostrar mensaje de éxito en la pantalla de login
+    setTimeout(() => {
+      const lerr = document.getElementById('l-err');
+      if (lerr) {
+        lerr.textContent = '✓ Contraseña actualizada correctamente. Ya puedes iniciar sesión.';
+        lerr.style.color = '#22c55e';
+        lerr.classList.add('show');
+        setTimeout(() => { lerr.classList.remove('show'); lerr.style.color = ''; }, 5000);
+      }
+    }, 100);
+  } catch(e) {
+    err.textContent = e.message || 'Código incorrecto o expirado';
+    err.classList.add('show');
+  } finally { btn.disabled = false; btn.textContent = 'Cambiar contraseña'; }
+}
+
+async function doResendReset() {
+  const err = document.getElementById('rp-err');
+  err.classList.remove('show');
+  try {
+    await api('/api/auth/forgot-password', 'POST', { email: resetEmail });
+    [0,1,2,3,4,5].forEach(i => { const el = document.getElementById('r'+i); if(el) el.value = ''; });
+    document.getElementById('r0').focus();
+    toast('Nuevo código enviado a ' + resetEmail);
+  } catch(e) { toast('Error al reenviar el código', 'err'); }
+}
+
 // ─── OTP INPUT BEHAVIOR ───────────────────────────────────────────────────────
 function setupOTP() {
   for (let i = 0; i < 6; i++) {
@@ -173,6 +245,36 @@ function setupOTP() {
     });
   }
   document.getElementById('l-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+  // Setup inputs OTP del flujo de reset de contraseña (r0–r5)
+  for (let i = 0; i < 6; i++) {
+    const el = document.getElementById('r'+i);
+    if (!el) continue;
+    el.addEventListener('input', e => {
+      const v = e.target.value.replace(/\D/g,'');
+      e.target.value = v.slice(-1);
+      if (v && i < 5) document.getElementById('r'+(i+1)).focus();
+    });
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !el.value && i > 0) document.getElementById('r'+(i-1)).focus();
+      if (e.key === 'Enter') doResetPassword();
+    });
+    el.addEventListener('paste', e => {
+      const txt = (e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'');
+      if (txt.length === 6) {
+        for (let j=0;j<6;j++) document.getElementById('r'+j).value = txt[j];
+        document.getElementById('r5').focus();
+        e.preventDefault();
+      }
+    });
+  }
+  // Enter en campos de contraseña de reset
+  ['rp-pass1','rp-pass2'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') doResetPassword(); });
+  });
+  // Enter en campo de email de forgot
+  const fpEmail = document.getElementById('fp-email');
+  if (fpEmail) fpEmail.addEventListener('keydown', e => { if(e.key==='Enter') doForgotPassword(); });
 }
 
 function startOtpTimer(secs) {
@@ -215,6 +317,7 @@ async function showDashboard() {
   initTooltipSystem();
   await loadFiltros();
   document.getElementById('filter-zone').style.display = '';
+  _updateFilterUI();   // UX-01/12: inicializar badge y botón limpiar
   showView('resumen');
 }
 
@@ -266,12 +369,27 @@ function getFilters() {
   return p.toString() ? '?' + p.toString() : '';
 }
 
+// UX-01 + UX-12: badge de filtros activos y visibilidad del botón limpiar
+function _updateFilterUI() {
+  const count = ['f-anio','f-mes','f-empresa','f-cat','f-ini']
+    .filter(id => document.getElementById(id)?.value).length;
+  const badge    = document.getElementById('filter-badge');
+  const clearBtn = document.querySelector('.btn-clear');
+  if (badge) {
+    badge.textContent = count + (count === 1 ? ' filtro activo' : ' filtros activos');
+    badge.style.display = count ? '' : 'none';
+  }
+  if (clearBtn) clearBtn.style.display = count ? '' : 'none';
+}
+
 function clearFilters() {
   ['f-anio','f-mes','f-empresa','f-cat','f-ini'].forEach(id => document.getElementById(id).value = '');
+  _updateFilterUI();
   applyFilters();
 }
 
 function applyFilters() {
+  _updateFilterUI();
   const v = document.querySelector('.view.active')?.id?.replace('view-','');
   if (v) renderView(v);
 }
@@ -319,7 +437,7 @@ async function loadResumen() {
 
     // Subtítulo
     const meses = [...new Set(mes.map(r => `${MESES[r.mes]||r.mes} ${r.anio}`))];
-    document.getElementById('resumen-sub').textContent = `Periodo: ${meses[0]||'—'} — ${meses[meses.length-1]||'—'} · BLU 2.0`;
+    document.getElementById('resumen-sub').textContent = `Periodo: ${meses[0]||'—'} — ${meses[meses.length-1]||'—'} · Portal Canales`;
 
     // Chart mes
     const labM = mes.map(r => `${MESES[r.mes]||r.mes}\n${r.anio}`);
@@ -346,8 +464,14 @@ async function loadResumen() {
         plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${fmtH(c.raw)} h`}}}}
     });
     const totalEmp = dataE.reduce((a,b)=>a+b,0);
+    // UX-20: Leyenda custom clickeable para filtrar segmentos del donut
     document.getElementById('emp-legend').innerHTML = labE.map((l,i)=>
-      `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+      `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;cursor:pointer;
+        border-radius:4px;padding:2px 4px;transition:background .15s"
+        onclick="toggleDonutSegment(chartEmpDonut,${i},this)"
+        onmouseenter="this.style.background='rgba(255,255,255,0.05)'"
+        onmouseleave="this.style.background=''"
+        title="Clic para mostrar/ocultar ${l}">
         <div style="width:8px;height:8px;border-radius:50%;background:${colsE[i]};flex-shrink:0"></div>
         <span style="font-size:10px;color:var(--text)">${l}</span>
         <span style="font-size:10px;color:var(--muted);margin-left:auto">${fmtH(dataE[i])} h · ${Math.round(dataE[i]/totalEmp*100)}%</span>
@@ -421,10 +545,13 @@ function renderIniciativasTable(rows) {
         <div class="panel-body" style="overflow-x:auto">
           <table class="tbl">
             <thead><tr>
-              <th>ID</th><th>Iniciativa</th><th>Categoría</th>
-              <th class="num">Horas</th><th class="num">% total</th>
-              ${verCostos?'<th class="num">Costo</th>':''}
-              <th class="num">Personas</th>
+              <th class="th-sort" id="th-ini-id"       onclick="sortIniciativas('id_iniciativa')">ID<i class="sort-arrow">↕</i></th>
+              <th class="th-sort" id="th-ini-nombre"   onclick="sortIniciativas('nombre_iniciativa')">Iniciativa<i class="sort-arrow">↕</i></th>
+              <th class="th-sort" id="th-ini-cat"      onclick="sortIniciativas('categoria_negocio')">Categoría<i class="sort-arrow">↕</i></th>
+              <th class="th-sort num" id="th-ini-horas"    onclick="sortIniciativas('horas')">Horas<i class="sort-arrow">↕</i></th>
+              <th class="th-sort num" id="th-ini-pct"      onclick="sortIniciativas('pct')">% total<i class="sort-arrow">↕</i></th>
+              ${verCostos?'<th class="th-sort num" id="th-ini-costo" onclick="sortIniciativas(\'costo\')">Costo<i class="sort-arrow">↕</i></th>':''}
+              <th class="th-sort num" id="th-ini-personas" onclick="sortIniciativas('personas')">Personas<i class="sort-arrow">↕</i></th>
             </tr></thead>
             <tbody id="ini-tbody"></tbody>
           </table>
@@ -436,10 +563,16 @@ function renderIniciativasTable(rows) {
   const countEl = document.getElementById('ini-search-count');
   if (countEl) countEl.textContent = rows.length + ' iniciativas';
 
+  // UX-13: Aplicar ordenamiento y actualizar flechas
+  _applySortArrows('ini', _sortIni, ['id_iniciativa','nombre_iniciativa','categoria_negocio','horas','pct','costo','personas'],
+    {id_iniciativa:'th-ini-id', nombre_iniciativa:'th-ini-nombre', categoria_negocio:'th-ini-cat',
+     horas:'th-ini-horas', pct:'th-ini-pct', costo:'th-ini-costo', personas:'th-ini-personas'});
+  const sortedRows = _sortIni.col ? _sortRows(rows, _sortIni) : rows;
+
   const tbody = document.getElementById('ini-tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = rows.length ? rows.map(r=>`
+  tbody.innerHTML = sortedRows.length ? sortedRows.map(r=>`
     <tr>
       <td><span class="id-badge" title="ID ADO: ${r.id_iniciativa}">${r.id_iniciativa}</span></td>
       <td><button class="drill-btn" onclick="drillIniciativa('${esc(String(r.id_iniciativa))}','${esc(r.nombre_iniciativa)}')">${r.nombre_iniciativa}</button></td>
@@ -459,14 +592,87 @@ function renderIniciativasTable(rows) {
     `<tr><td colspan="7"><div class="no-data">Sin resultados</div></td></tr>`;
 }
 
-function filterIniciativas() {
-  const q = document.getElementById('ini-search').value.toLowerCase();
-  const filtered = allIniciativas.filter(r =>
-    r.nombre_iniciativa.toLowerCase().includes(q) ||
-    String(r.id_iniciativa).includes(q) ||
-    r.categoria_negocio.toLowerCase().includes(q)
-  );
+// UX-10: Debounce — timers por cada búsqueda para no disparar en cada tecla
+let _timerIni, _timerPersonas, _timerEquipo, _timerLT;
+
+// UX-13: Estado de ordenamiento por tabla
+let _sortIni      = { col: null,   dir: 1 };
+let _sortPersonas = { col: 'horas', dir: -1 };
+let _sortLT       = { col: 'lead_time', dir: -1 };
+
+// ── UX-13: helpers genéricos de ordenamiento ──────────────────────────────────
+function _sortRows(rows, state) {
+  return [...rows].sort((a, b) => {
+    const va = a[state.col] ?? '';
+    const vb = b[state.col] ?? '';
+    if (typeof va === 'number' && typeof vb === 'number') return state.dir * (va - vb);
+    return state.dir * String(va).localeCompare(String(vb), 'es', { numeric: true });
+  });
+}
+
+function _applySortArrows(prefix, state, cols, thMap) {
+  cols.forEach(col => {
+    const thId = thMap[col];
+    if (!thId) return;
+    const th = document.getElementById(thId);
+    if (!th) return;
+    th.classList.remove('asc', 'desc');
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = '↕';
+    if (state.col === col) {
+      th.classList.add(state.dir === 1 ? 'asc' : 'desc');
+      if (arrow) arrow.textContent = state.dir === 1 ? '▲' : '▼';
+    }
+  });
+}
+
+function _toggleSort(state, col) {
+  if (state.col === col) { state.dir *= -1; }
+  else { state.col = col; state.dir = 1; }
+}
+
+// ── Funciones públicas de sort (llamadas desde onclick) ───────────────────────
+function sortIniciativas(col) {
+  _toggleSort(_sortIni, col);
+  // Re-renderizar con los datos ya filtrados en memoria (filterIniciativas los filtra)
+  const q = document.getElementById('ini-search')?.value?.toLowerCase() || '';
+  const filtered = q
+    ? allIniciativas.filter(r =>
+        r.nombre_iniciativa.toLowerCase().includes(q) ||
+        String(r.id_iniciativa).includes(q) ||
+        r.categoria_negocio.toLowerCase().includes(q))
+    : allIniciativas;
   renderIniciativasTable(filtered);
+}
+
+function sortPersonas(col) {
+  _toggleSort(_sortPersonas, col);
+  const q = document.getElementById('persona-search')?.value?.toLowerCase() || '';
+  const filtered = q
+    ? allPersonas.filter(r =>
+        r.nombre_persona.toLowerCase().includes(q) ||
+        r.empresa.toLowerCase().includes(q) ||
+        r.rol.toLowerCase().includes(q))
+    : allPersonas;
+  renderPersonasTable(filtered);
+}
+
+function sortLT(col) {
+  _toggleSort(_sortLT, col);
+  if (_ltData) _runLTFiltro();
+}
+
+function filterIniciativas() {
+  clearTimeout(_timerIni);
+  _timerIni = setTimeout(() => {
+    const q = document.getElementById('ini-search').value.toLowerCase();
+    const filtered = allIniciativas.filter(r =>
+      r.nombre_iniciativa.toLowerCase().includes(q) ||
+      String(r.id_iniciativa).includes(q) ||
+      r.categoria_negocio.toLowerCase().includes(q)
+    );
+    renderIniciativasTable(filtered);
+  }, 250);
 }
 
 async function drillIniciativa(idIni, nombre) {
@@ -635,16 +841,36 @@ async function loadAvance() {
 }
 
 function applyAvanceFiltro() {
-  const desde = document.getElementById('av-desde').value;
-  const hasta  = document.getElementById('av-hasta').value;
+  const elDesde = document.getElementById('av-desde');
+  const elHasta = document.getElementById('av-hasta');
+  const errEl   = document.getElementById('av-date-err');
+  // Limpiar estado de error previo
+  elDesde.classList.remove('input-error');
+  elHasta.classList.remove('input-error');
+  if (errEl) errEl.style.display = 'none';
+
+  const desde = elDesde.value;
+  const hasta  = elHasta.value;
   if (!desde || !hasta) { toast('Selecciona fecha desde y hasta', 'err'); return; }
-  if (desde > hasta) { toast('La fecha "desde" debe ser anterior a "hasta"', 'err'); return; }
+  if (desde > hasta) {
+    // UX-08: validación visual inline
+    elDesde.classList.add('input-error');
+    elHasta.classList.add('input-error');
+    if (errEl) { errEl.textContent = '⚠ "Desde" debe ser anterior a "Hasta"'; errEl.style.display = ''; }
+    toast('La fecha "desde" debe ser anterior a "hasta"', 'err');
+    return;
+  }
   loadAvance();
 }
 
 function clearAvanceFiltro() {
-  document.getElementById('av-desde').value = '';
-  document.getElementById('av-hasta').value = '';
+  const elDesde = document.getElementById('av-desde');
+  const elHasta = document.getElementById('av-hasta');
+  elDesde.value = ''; elHasta.value = '';
+  elDesde.classList.remove('input-error');
+  elHasta.classList.remove('input-error');
+  const errEl = document.getElementById('av-date-err');
+  if (errEl) errEl.style.display = 'none';
   loadAvance();
 }
 
@@ -895,8 +1121,15 @@ function renderPersonasTable(rows) {
   const verCostos = ['admin','gerente'].includes(USER.perfil);
   const countEl = document.getElementById('personas-count');
   if (countEl) countEl.textContent = rows.length + ' personas';
-  document.getElementById('personas-tbody').innerHTML = rows.length ?
-    rows.map(r=>`<tr>
+
+  // UX-13: Aplicar ordenamiento
+  const thMap = { nombre_persona:'th-per-nombre', empresa:'th-per-empresa', rol:'th-per-rol',
+                  horas:'th-per-horas', costo:'th-costo-per' };
+  _applySortArrows('per', _sortPersonas, Object.keys(thMap), thMap);
+  const sorted = _sortRows(rows, _sortPersonas);
+
+  document.getElementById('personas-tbody').innerHTML = sorted.length ?
+    sorted.map(r=>`<tr>
       <td>${r.nombre_persona}</td>
       <td><span class="badge ${BADGE_EMPRESA[r.empresa]||'badge-default'}">${r.empresa}</span></td>
       <td class="muted" style="font-size:11px">${r.rol}</td>
@@ -913,12 +1146,15 @@ function renderPersonasTable(rows) {
 }
 
 function filterPersonas() {
-  const q = document.getElementById('persona-search').value.toLowerCase();
-  renderPersonasTable(allPersonas.filter(r =>
-    r.nombre_persona.toLowerCase().includes(q) ||
-    r.empresa.toLowerCase().includes(q) ||
-    r.rol.toLowerCase().includes(q)
-  ));
+  clearTimeout(_timerPersonas);
+  _timerPersonas = setTimeout(() => {
+    const q = document.getElementById('persona-search').value.toLowerCase();
+    renderPersonasTable(allPersonas.filter(r =>
+      r.nombre_persona.toLowerCase().includes(q) ||
+      r.empresa.toLowerCase().includes(q) ||
+      r.rol.toLowerCase().includes(q)
+    ));
+  }, 250);
 }
 
 async function exportPersonasExcel() {
@@ -1012,7 +1248,17 @@ async function loadCategorias() {
   if (chartCat) chartCat.destroy();
   chartCat = new Chart(document.getElementById('chart-cat'), {
     type:'doughnut', data:{labels:rows.map(r=>r.categoria_negocio), datasets:[{data:rows.map(r=>r.horas), backgroundColor:cols.slice(0,rows.length), borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:12}},tooltip:{callbacks:{label:c=>`${c.label}: ${fmtH(c.raw)} h`}}}}
+    // UX-20: onHover/onLeave cambia el cursor para indicar que la leyenda es clickeable
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{
+        legend:{
+          position:'right',
+          labels:{font:{size:10},boxWidth:12},
+          onHover: (e, item, legend) => { legend.chart.canvas.style.cursor = 'pointer'; },
+          onLeave: (e, item, legend) => { legend.chart.canvas.style.cursor = 'default'; }
+        },
+        tooltip:{callbacks:{label:c=>`${c.label}: ${fmtH(c.raw)} h`}}
+      }}
   });
 
   document.getElementById('cat-detail').innerHTML = rows.map(r=>`
@@ -1138,7 +1384,9 @@ async function uploadCSV(file) {
     }
 
     status.innerHTML = html;
-    toast('CSV importado correctamente', 'ok');
+    // UX-07: Toast con conteo de resultados
+    const sinLookupN = data.sin_lookup?.length || 0;
+    toast(`✓ ${fmtN(data.tasks_con_horas)} tasks · ${data.iniciativas || 0} iniciativas${sinLookupN ? ` · ⚠ ${sinLookupN} sin lookup` : ''}`, sinLookupN ? 'warn' : 'ok');
     await loadFiltros();
   } catch(e) {
     status.innerHTML = `<div style="font-size:13px;color:var(--error);padding:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px">
@@ -1161,14 +1409,17 @@ async function loadEquipo() {
 }
 
 function filterEquipo() {
-  const q = document.getElementById('equipo-search').value.toLowerCase();
-  const filtered = allEquipoRows.filter(r =>
-    r.nombre.toLowerCase().includes(q) ||
-    r.correo.toLowerCase().includes(q) ||
-    r.empresa.toLowerCase().includes(q) ||
-    r.rol.toLowerCase().includes(q)
-  );
-  renderEquipoTabla(filtered, true);
+  clearTimeout(_timerEquipo);
+  _timerEquipo = setTimeout(() => {
+    const q = document.getElementById('equipo-search').value.toLowerCase();
+    const filtered = allEquipoRows.filter(r =>
+      r.nombre.toLowerCase().includes(q) ||
+      r.correo.toLowerCase().includes(q) ||
+      r.empresa.toLowerCase().includes(q) ||
+      r.rol.toLowerCase().includes(q)
+    );
+    renderEquipoTabla(filtered, true);
+  }, 250);
 }
 
 function renderEquipoTabla(rows, preserveSearch = false) {
@@ -1620,10 +1871,40 @@ function dlBtns(...acciones) {
 }
 
 // Descarga cualquier canvas Chart.js como PNG
+// UX-20: Toggle de segmento en donut con feedback visual en la leyenda custom
+function toggleDonutSegment(chart, index, el) {
+  if (!chart) return;
+  // toggleDataVisibility actúa sobre el segmento individual (no el dataset completo)
+  chart.toggleDataVisibility(index);
+  chart.update();
+  const ahoraVisible = chart.getDataVisibility(index);
+  el.style.opacity        = ahoraVisible ? '1'             : '0.35';
+  el.style.textDecoration = ahoraVisible ? ''              : 'line-through';
+}
+
+// UX-06: Feedback visual en botones de descarga
+function flashBtn(btn) {
+  if (!btn) return;
+  const orig = btn.innerHTML;
+  const origColor = btn.style.color;
+  btn.innerHTML = '✓ Descargado';
+  btn.style.color = '#22c55e';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.innerHTML = orig;
+    btn.style.color = origColor;
+    btn.disabled = false;
+  }, 2000);
+}
+function _getDlBtn() {
+  // Obtiene el botón .panel-dl-btn que disparó el evento actual (si existe)
+  return window.event?.target?.closest?.('.panel-dl-btn') || null;
+}
+
 function downloadChart(canvasId, filename) {
+  const btn = _getDlBtn();
   const canvas = document.getElementById(canvasId);
   if (!canvas) { toast('Gráfica no disponible', 'err'); return; }
-  // Fondo blanco (Chart.js usa fondo transparente por defecto)
   const off = document.createElement('canvas');
   off.width = canvas.width; off.height = canvas.height;
   const ctx = off.getContext('2d');
@@ -1634,27 +1915,31 @@ function downloadChart(canvasId, filename) {
   link.download = filename + '.png';
   link.href = off.toDataURL('image/png');
   link.click();
+  flashBtn(btn);
   toast('Imagen descargada');
 }
 
 // Descarga un <table> HTML como Excel usando SheetJS
 function exportTableExcel(tableId, filename) {
+  const btn = _getDlBtn();
   let el = document.getElementById(tableId);
-  // Si el contenedor no es la tabla directamente, buscar dentro
   if (el && el.tagName !== 'TABLE') el = el.querySelector('table');
   if (!el) { toast('Tabla no disponible', 'err'); return; }
   const wb = XLSX.utils.table_to_book(el, { sheet: 'Datos', raw: false });
   XLSX.writeFile(wb, filename + '.xlsx');
+  flashBtn(btn);
   toast('Excel descargado');
 }
 
 // Descarga datos arbitrarios (array de objetos) como Excel
 function exportDataExcel(rows, sheetName, filename) {
+  const btn = _getDlBtn();
   if (!rows || !rows.length) { toast('Sin datos para exportar', 'err'); return; }
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, filename + '.xlsx');
+  flashBtn(btn);
   toast('Excel descargado');
 }
 
@@ -1736,6 +2021,10 @@ function calcLTKpis(iniciativas) {
 }
 
 function applyLTFiltro() {
+  clearTimeout(_timerLT);
+  _timerLT = setTimeout(_runLTFiltro, 250);
+}
+function _runLTFiltro() {
   if (!_ltData) return;
   const texto = (document.getElementById('lt-search')?.value || '').toLowerCase().trim();
   const cat   =  document.getElementById('lt-cat')?.value   || '';
@@ -1842,7 +2131,12 @@ function renderLTTabla(iniciativas) {
     return `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}`;
   }
 
-  const sorted = [...iniciativas].sort((a, b) => b.lead_time - a.lead_time);
+  // UX-13: Aplicar ordenamiento (default: lead_time desc)
+  const thMapLT = { nombre:'th-lt-nombre', fecha_ini:'th-lt-ini', fecha_fin:'th-lt-fin',
+                    lead_time:'th-lt-lt', pct:'th-lt-pct' };
+  _applySortArrows('lt', _sortLT, Object.keys(thMapLT), thMapLT);
+  const sorted = _sortRows(iniciativas, _sortLT);
+
   if (!sorted.length) {
     document.getElementById('lt-tabla-content').innerHTML =
       '<div class="no-data">Sin iniciativas que coincidan con el filtro</div>';
@@ -1881,11 +2175,11 @@ function renderLTTabla(iniciativas) {
     <table class="tbl">
       <thead><tr>
         <th>#</th>
-        <th>Iniciativa</th>
-        <th>Fecha inicio</th>
-        <th>Fecha fin</th>
-        <th>Lead Time</th>
-        <th>Avance</th>
+        <th class="th-sort" id="th-lt-nombre"  onclick="sortLT('nombre')">Iniciativa<i class="sort-arrow">↕</i></th>
+        <th class="th-sort" id="th-lt-ini"     onclick="sortLT('fecha_ini')">Fecha inicio<i class="sort-arrow">↕</i></th>
+        <th class="th-sort" id="th-lt-fin"     onclick="sortLT('fecha_fin')">Fecha fin<i class="sort-arrow">↕</i></th>
+        <th class="th-sort" id="th-lt-lt"      onclick="sortLT('lead_time')">Lead Time<i class="sort-arrow">↕</i></th>
+        <th class="th-sort" id="th-lt-pct"     onclick="sortLT('pct')">Avance<i class="sort-arrow">↕</i></th>
         <th style="text-align:right">Tasks</th>
       </tr></thead>
       <tbody>${rows}</tbody>

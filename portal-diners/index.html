@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Portal Gerencial — Diners Club BLU 2.0</title>
+<title>Portal Canales — Diners Club</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600;6..12,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
@@ -22,8 +22,8 @@
   <path d="M143.877,90.429 C143.841,68.075 129.865,49.007 110.18,41.451 L110.18,139.398 C129.865,131.84 143.841,112.791 143.877,90.429 Z M72.613,139.379 L72.613,41.46 C52.941,49.034 38.988,68.075 38.935,90.429 C38.988,112.773 52.941,131.805 72.613,139.379 Z M91.405,7.641 C45.687,7.658 8.649,44.71 8.636,90.429 C8.649,136.138 45.687,173.181 91.405,173.199 C137.124,173.181 174.176,136.138 174.189,90.429 C174.176,44.71 137.124,7.658 91.405,7.641 Z M91.202,181 C41.173,181.242 0,140.716 0,91.367 C0,37.443 41.173,0.157 91.202,0.165 L114.648,0.165 C164.082,0.157 209.205,37.434 209.205,91.367 C209.205,140.698 164.082,181 114.648,181 L91.202,181 Z" fill="white"/>
 </svg>
       </div>
-      <div class="auth-title">Portal Gerencial</div>
-      <div class="auth-subtitle">Acceso restringido · Personal autorizado · BLU 2.0</div>
+      <div class="auth-title">Portal Canales</div>
+      <div class="auth-subtitle">Acceso restringido · Personal autorizado</div>
     </div>
     <div class="auth-body">
       <div class="form-group">
@@ -36,8 +36,90 @@
         <div class="error-msg" id="l-err">Credenciales incorrectas. Verifica tus datos.</div>
       </div>
       <button class="btn-primary" id="btn-login" onclick="doLogin()">Ingresar al portal</button>
+      <div class="auth-link-row">
+        ¿Olvidaste tu contraseña? <button class="link-btn" onclick="showScreen('forgot')">Recupérala aquí</button>
+      </div>
     </div>
     <div class="auth-footer">Conexión local segura · Autenticación de dos factores habilitada</div>
+  </div>
+</div>
+
+<!-- ══════════════ PANTALLA OLVIDÉ CONTRASEÑA ══════════════ -->
+<div class="screen" id="screen-forgot">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">
+        <svg height="40" viewBox="0 0 209 182" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M143.877,90.429 C143.841,68.075 129.865,49.007 110.18,41.451 L110.18,139.398 C129.865,131.84 143.841,112.791 143.877,90.429 Z M72.613,139.379 L72.613,41.46 C52.941,49.034 38.988,68.075 38.935,90.429 C38.988,112.773 52.941,131.805 72.613,139.379 Z M91.405,7.641 C45.687,7.658 8.649,44.71 8.636,90.429 C8.649,136.138 45.687,173.181 91.405,173.199 C137.124,173.181 174.176,136.138 174.189,90.429 C174.176,44.71 137.124,7.658 91.405,7.641 Z M91.202,181 C41.173,181.242 0,140.716 0,91.367 C0,37.443 41.173,0.157 91.202,0.165 L114.648,0.165 C164.082,0.157 209.205,37.434 209.205,91.367 C209.205,140.698 164.082,181 114.648,181 L91.202,181 Z" fill="white"/>
+</svg>
+      </div>
+      <div class="auth-title">Recuperar contraseña</div>
+      <div class="auth-subtitle">Te enviaremos un código de verificación</div>
+    </div>
+    <div class="auth-body">
+      <p style="font-size:13px;color:var(--muted);margin:0 0 18px;line-height:1.6">
+        Ingresa tu correo institucional y recibirás un código de 6 dígitos para restablecer tu contraseña.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Correo institucional</label>
+        <input type="email" id="fp-email" class="form-input" placeholder="correo@dinersclub.com.ec" autocomplete="email">
+        <div class="error-msg" id="fp-err"></div>
+      </div>
+      <button class="btn-primary" id="btn-forgot" onclick="doForgotPassword()">Enviar código de recuperación</button>
+      <div class="auth-link-row" style="margin-top:16px">
+        <button class="link-btn" onclick="showScreen('login')">← Volver al inicio de sesión</button>
+      </div>
+    </div>
+    <div class="auth-footer">El código expirará en 15 minutos por seguridad</div>
+  </div>
+</div>
+
+<!-- ══════════════ PANTALLA NUEVA CONTRASEÑA ══════════════ -->
+<div class="screen" id="screen-reset">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">
+        <svg height="40" viewBox="0 0 209 182" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M143.877,90.429 C143.841,68.075 129.865,49.007 110.18,41.451 L110.18,139.398 C129.865,131.84 143.841,112.791 143.877,90.429 Z M72.613,139.379 L72.613,41.46 C52.941,49.034 38.988,68.075 38.935,90.429 C38.988,112.773 52.941,131.805 72.613,139.379 Z M91.405,7.641 C45.687,7.658 8.649,44.71 8.636,90.429 C8.649,136.138 45.687,173.181 91.405,173.199 C137.124,173.181 174.176,136.138 174.189,90.429 C174.176,44.71 137.124,7.658 91.405,7.641 Z M91.202,181 C41.173,181.242 0,140.716 0,91.367 C0,37.443 41.173,0.157 91.202,0.165 L114.648,0.165 C164.082,0.157 209.205,37.434 209.205,91.367 C209.205,140.698 164.082,181 114.648,181 L91.202,181 Z" fill="white"/>
+</svg>
+      </div>
+      <div class="auth-title">Nueva contraseña</div>
+      <div class="auth-subtitle">Código enviado a <span id="reset-email-show">—</span></div>
+    </div>
+    <div class="auth-body">
+      <p class="otp-info" style="margin-bottom:12px">Ingresa el código de 6 dígitos</p>
+      <div class="otp-wrap">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="r0">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="r1">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="r2">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="r3">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="r4">
+        <input class="otp-d" type="text" maxlength="1" inputmode="numeric" id="r5">
+      </div>
+      <div style="margin-top:16px">
+        <div class="form-group">
+          <label class="form-label">Nueva contraseña</label>
+          <input type="password" id="rp-pass1" class="form-input" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar contraseña</label>
+          <input type="password" id="rp-pass2" class="form-input" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div class="reset-rules">
+          <span>Mínimo 8 caracteres</span><span>·</span>
+          <span>Mayúscula y minúscula</span><span>·</span>
+          <span>Número</span><span>·</span>
+          <span>Símbolo (!@#$...)</span>
+        </div>
+        <div class="error-msg" id="rp-err" style="margin-bottom:10px"></div>
+        <button class="btn-primary" id="btn-reset" onclick="doResetPassword()">Cambiar contraseña</button>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--muted);margin-top:16px">
+        ¿No recibiste el código? &nbsp;<button class="link-btn" onclick="doResendReset()">Reenviar</button>
+        &nbsp;·&nbsp;<button class="link-btn" onclick="showScreen('login')">Volver</button>
+      </div>
+    </div>
+    <div class="auth-footer">Por seguridad el código expira en 15 minutos</div>
   </div>
 </div>
 
@@ -162,7 +244,8 @@
     <select class="filter-sel" id="f-empresa" onchange="applyFilters()"><option value="">Todas las empresas</option></select>
     <select class="filter-sel" id="f-cat" onchange="applyFilters()"><option value="">Todas las categorías</option></select>
     <select class="filter-sel" id="f-ini" onchange="applyFilters()"><option value="">Todas las iniciativas</option></select>
-    <button class="btn-clear" onclick="clearFilters()">✕ Limpiar</button>
+    <span class="filter-active-badge" id="filter-badge" style="display:none">0 filtros</span>
+    <button class="btn-clear" onclick="clearFilters()" style="display:none">✕ Limpiar</button>
   </div>
 </div>
 
@@ -243,8 +326,11 @@
     <div class="panel-body" style="overflow-x:auto">
       <table class="tbl" id="personas-table">
         <thead><tr>
-          <th>Nombre</th><th>Empresa</th><th>Rol</th>
-          <th class="num">Horas</th><th class="num" id="th-costo-per">Costo</th>
+          <th class="th-sort" id="th-per-nombre" onclick="sortPersonas('nombre_persona')">Nombre<i class="sort-arrow">↕</i></th>
+          <th class="th-sort" id="th-per-empresa" onclick="sortPersonas('empresa')">Empresa<i class="sort-arrow">↕</i></th>
+          <th class="th-sort" id="th-per-rol" onclick="sortPersonas('rol')">Rol<i class="sort-arrow">↕</i></th>
+          <th class="th-sort num" id="th-per-horas" onclick="sortPersonas('horas')">Horas<i class="sort-arrow">↕</i></th>
+          <th class="th-sort num" id="th-costo-per" onclick="sortPersonas('costo')">Costo<i class="sort-arrow">↕</i></th>
         </tr></thead>
         <tbody id="personas-tbody"><tr><td colspan="5"><div class="loader">Cargando…</div></td></tr></tbody>
       </table>
@@ -290,6 +376,7 @@
       <button class="avance-filter-btn" onclick="applyAvanceFiltro()">Aplicar</button>
       <button class="avance-filter-btn avance-filter-btn-clear" onclick="clearAvanceFiltro()">Limpiar</button>
     </div>
+    <div class="av-date-err" id="av-date-err"></div>
   </div>
 
   <!-- KPIs -->
