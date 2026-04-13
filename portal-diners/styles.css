@@ -647,3 +647,11 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
 /* ── UX-11: Filtros de log de accesos ── */
 .logs-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ── Inner tabs (Indicadores) ── */
+.ind-tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0}
+.ind-tab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;
+  padding:8px 18px;font-family:'Nunito Sans',sans-serif;font-size:13px;font-weight:600;
+  color:var(--muted);cursor:pointer;transition:all .18s;border-radius:6px 6px 0 0}
+.ind-tab:hover{color:var(--text2);background:var(--surface2)}
+.ind-tab.active{color:var(--blue-el);border-bottom-color:var(--blue-el);background:var(--surface2)}

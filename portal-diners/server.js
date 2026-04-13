@@ -106,6 +106,11 @@ db.run(`CREATE TABLE IF NOT EXISTS invitaciones (
   usado     INTEGER DEFAULT 0,
   creado_en TEXT DEFAULT (datetime('now'))
 )`);
+// ─── MIGRACIONES SILENCIOSAS ──────────────────────────────────────────────────
+// Añaden columnas que no existían en versiones anteriores de la BD.
+// SQLite lanza error si la columna ya existe — se ignora con try/catch.
+try { db.run(`ALTER TABLE sesiones_log ADD COLUMN detalle TEXT`); } catch(_) {}
+
 // Limpiar tokens expirados al arrancar
 db.run(`DELETE FROM token_blocklist WHERE expira < ${Math.floor(Date.now()/1000)}`);
 // Migración silenciosa: password_hash puede ser cadena vacía en cuentas pendientes
@@ -130,7 +135,7 @@ db.run(`CREATE TABLE IF NOT EXISTS tarifas (
 )`);
 
 // Migración de datos: detectar esquema viejo y recrear solo tablas de datos
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 7;
 db.run("CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT)");
 db.run("INSERT OR IGNORE INTO _meta VALUES ('schema_version','0')");
 const currentVersion = parseInt((db.get("SELECT value FROM _meta WHERE key='schema_version'") || {value:'0'}).value);
@@ -140,6 +145,7 @@ if (currentVersion < SCHEMA_VERSION) {
   db.run('DROP TABLE IF EXISTS datos_horas');
   db.run('DROP TABLE IF EXISTS tasks_plan');
   db.run('DROP TABLE IF EXISTS test_cases');
+  db.run('DROP TABLE IF EXISTS bugs_csv');
   db.run(`UPDATE _meta SET value='${SCHEMA_VERSION}' WHERE key='schema_version'`);
 }
 
@@ -152,7 +158,10 @@ db.run(`CREATE TABLE IF NOT EXISTS datos_horas (
   nombre_persona TEXT, correo TEXT,
   empresa TEXT, rol TEXT, categoria_negocio TEXT,
   horas_completadas REAL, costo REAL, tarifa REAL,
-  mes INTEGER, anio INTEGER, estado TEXT
+  mes INTEGER, anio INTEGER, estado TEXT,
+  sprint TEXT,
+  horas_estimadas REAL DEFAULT 0,
+  area_path TEXT DEFAULT ''
 )`);
 db.run(`CREATE TABLE IF NOT EXISTS tasks_plan (
   id_iniciativa TEXT PRIMARY KEY,
@@ -168,6 +177,20 @@ db.run(`CREATE TABLE IF NOT EXISTS tasks_plan (
 db.run(`CREATE INDEX IF NOT EXISTS idx_id_ini  ON datos_horas(id_iniciativa)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_id_epic ON datos_horas(id_epic)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_id_hu   ON datos_horas(id_hu)`);
+
+db.run(`CREATE TABLE IF NOT EXISTS bugs_csv (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id_bug TEXT,
+  titulo TEXT,
+  estado TEXT,
+  sprint TEXT,
+  ambiente TEXT,
+  id_iniciativa TEXT, nombre_iniciativa TEXT,
+  id_epic TEXT,       nombre_epic TEXT,
+  id_hu TEXT,         nombre_hu TEXT,
+  created_date TEXT,
+  closed_date TEXT
+)`);
 
 db.run(`CREATE TABLE IF NOT EXISTS historial_csv (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -837,6 +860,14 @@ app.post('/api/admin/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('a
       const horas = parseFloat(r['Completed Work'] || 0);
       const state = (r['State'] || '').trim();
 
+      // Sprint desde Iteration Path (último segmento)
+      const itPath = (r['Iteration Path'] || '').trim();
+      const sprint = itPath ? itPath.split('\\').pop().trim() : '';
+
+      // Area Path y horas estimadas
+      const area_path      = (r['Area Path'] || '').trim();
+      const horas_estimadas = parseFloat(r['Original Estimate'] || 0) || 0;
+
       // Resolver empresa/rol
       const miembro = correo ? equipoMap[correo.toLowerCase()] : null;
       if (!miembro) {
@@ -868,7 +899,7 @@ app.post('/api/admin/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('a
         ...jer, nombre_persona: nombre, correo, empresa, rol,
         categoria_negocio: cat, horas_completadas: horas,
         costo, tarifa, mes, anio, estado: state,
-        fecha_ini: fechaIni, fecha_fin: fechaFin,
+        fecha_ini: fechaIni, fecha_fin: fechaFin, sprint, area_path, horas_estimadas,
         // Regla de negocio: Closed + Hasta_Task obligatoria + horas > 0 + no Diners
         // Tasks Closed sin Hasta_Task no cuentan (sin fecha de cierre confirmada)
         valido: state === 'Closed' && !!fechaFin && horas > 0 && empresa !== 'Diners'
@@ -884,18 +915,56 @@ app.post('/api/admin/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('a
       db.run(`INSERT INTO datos_horas
         (id_iniciativa,nombre_iniciativa,id_epic,nombre_epic,id_hu,nombre_hu,
          id_task,nombre_task,nombre_persona,correo,empresa,rol,categoria_negocio,
-         horas_completadas,costo,tarifa,mes,anio,estado)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         horas_completadas,costo,tarifa,mes,anio,estado,sprint,horas_estimadas,area_path)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [t.id_iniciativa||'SIN_INI', t.nombre_iniciativa||'Sin Iniciativa',
          t.id_epic||'SIN_EPIC',      t.nombre_epic||'Sin Epic',
          t.id_hu||'SIN_HU',          t.nombre_hu||'Sin HU',
          t.id_task, t.nombre_task,   t.nombre_persona, t.correo,
          t.empresa, t.rol, t.categoria_negocio,
          t.horas_completadas, t.costo, t.tarifa,
-         t.mes, t.anio, t.estado]);
+         t.mes, t.anio, t.estado, t.sprint||'',
+         t.horas_estimadas||0, t.area_path||'']);
       insertadas++;
     }
     db.run('COMMIT');
+
+    // ── Procesar bugs ──
+    const bugsRaw = raw.filter(r => (r['Work Item Type']||'').trim() === 'Bug');
+    console.log(`  Bugs en CSV: ${bugsRaw.length}`);
+
+    db.run('DELETE FROM bugs_csv');
+    db.run('BEGIN TRANSACTION');
+    let bugsInsertados = 0;
+    for (const r of bugsRaw) {
+      const id = normId(r['ID']);
+      const titulo = (() => {
+        for (const t of ['Title 1','Title 2','Title 3','Title 4','Title 5'])
+          if (r[t] && r[t].trim()) return r[t].trim();
+        return '';
+      })();
+      const state    = (r['State'] || '').trim();
+      const itPath   = (r['Iteration Path'] || '').trim();
+      const sprint   = itPath ? itPath.split('\\').pop().trim() : '';
+      const ambiente = (r['Ambiente_Bug'] || '').trim();
+      const created  = parseFecha(r['Created Date']);
+      const closed   = parseFecha(r['Closed Date']);
+      const jer      = resolverJerarquia(id);
+
+      db.run(`INSERT INTO bugs_csv
+        (id_bug,titulo,estado,sprint,ambiente,
+         id_iniciativa,nombre_iniciativa,id_epic,nombre_epic,id_hu,nombre_hu,
+         created_date,closed_date)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [id, titulo, state, sprint, ambiente,
+         jer.id_iniciativa||'SIN_INI', jer.nombre_iniciativa||'Sin Iniciativa',
+         jer.id_epic||'SIN_EPIC',      jer.nombre_epic||'Sin Epic',
+         jer.id_hu||'SIN_HU',          jer.nombre_hu||'Sin HU',
+         created, closed]);
+      bugsInsertados++;
+    }
+    db.run('COMMIT');
+    console.log(`  Bugs insertados: ${bugsInsertados}`);
 
     // ── Calcular tasks_plan (TODAS las tasks, sin filtros) ──
     const planMap = {};
@@ -1165,6 +1234,204 @@ app.get('/api/indicadores/lead-time', authMiddleware, (req, res) => {
   }
 
   res.json({ iniciativas, kpis: { promedio, mediana, minimo, maximo, total: n }, distribucion });
+});
+
+app.get('/api/indicadores/bugs/produccion', authMiddleware, (req, res) => {
+  const resumen = db.all(`
+    SELECT ambiente, COUNT(*) as total
+    FROM bugs_csv
+    WHERE ambiente != ''
+    GROUP BY ambiente
+    ORDER BY total DESC
+  `);
+  const porEstado = db.all(`
+    SELECT estado, COUNT(*) as total
+    FROM bugs_csv
+    GROUP BY estado
+    ORDER BY total DESC
+  `);
+  const enProduccion = db.all(`
+    SELECT ambiente, estado, COUNT(*) as total
+    FROM bugs_csv
+    WHERE ambiente IN ('PRODUCCION','EXTERNO_PRODUCCION','GSF')
+    GROUP BY ambiente, estado
+    ORDER BY ambiente, estado
+  `);
+  const total = (db.get('SELECT COUNT(*) as n FROM bugs_csv') || {n:0}).n;
+  res.json({ resumen, porEstado, enProduccion, total });
+});
+
+app.get('/api/indicadores/bugs/por-iniciativa', authMiddleware, (req, res) => {
+  const bugs = db.all(`
+    SELECT id_iniciativa, nombre_iniciativa, COUNT(*) as total_bugs
+    FROM bugs_csv
+    WHERE id_iniciativa NOT IN ('SIN_INI','')
+    GROUP BY id_iniciativa
+    ORDER BY total_bugs DESC
+  `);
+  const tasks = db.all(`
+    SELECT id_iniciativa, nombre_iniciativa, total_tasks, cerradas
+    FROM tasks_plan
+    WHERE id_iniciativa NOT IN ('SIN_INI','')
+  `);
+  const taskMap = {};
+  tasks.forEach(t => { taskMap[t.id_iniciativa] = t; });
+  const iniciativas = bugs.map(b => ({
+    id_iniciativa:  b.id_iniciativa,
+    nombre:         b.nombre_iniciativa,
+    total_bugs:     b.total_bugs,
+    total_tasks:    taskMap[b.id_iniciativa]?.total_tasks || 0,
+    cerradas:       taskMap[b.id_iniciativa]?.cerradas    || 0,
+    densidad:       taskMap[b.id_iniciativa]?.total_tasks > 0
+                      ? Math.round(b.total_bugs / taskMap[b.id_iniciativa].total_tasks * 100) / 100
+                      : null
+  }));
+  res.json({ iniciativas });
+});
+
+app.get('/api/indicadores/bugs/por-sprint', authMiddleware, (req, res) => {
+  const sprints = db.all(`
+    SELECT sprint,
+           COUNT(*) as total,
+           SUM(CASE WHEN estado='Closed' THEN 1 ELSE 0 END) as cerrados,
+           SUM(CASE WHEN estado!='Closed' THEN 1 ELSE 0 END) as abiertos
+    FROM bugs_csv
+    WHERE sprint IS NOT NULL AND sprint != ''
+    GROUP BY sprint
+    ORDER BY sprint
+  `);
+  res.json({ sprints });
+});
+
+app.get('/api/indicadores/bugs/mttr', authMiddleware, (req, res) => {
+  const cerrados = db.all(`
+    SELECT id_bug, titulo, sprint, ambiente, created_date, closed_date,
+           CAST(ROUND(julianday(closed_date) - julianday(created_date)) AS INTEGER) as dias
+    FROM bugs_csv
+    WHERE closed_date IS NOT NULL AND closed_date != ''
+      AND created_date IS NOT NULL AND created_date != ''
+      AND julianday(closed_date) >= julianday(created_date)
+    ORDER BY dias DESC
+  `);
+  const n       = cerrados.length;
+  const promedio = n > 0
+    ? Math.round(cerrados.reduce((s, r) => s + (r.dias || 0), 0) / n)
+    : 0;
+  const mediana = (() => {
+    if (!n) return 0;
+    const sorted = [...cerrados].map(r => r.dias).sort((a,b) => a-b);
+    return n % 2 === 0
+      ? Math.round((sorted[n/2-1] + sorted[n/2]) / 2)
+      : sorted[Math.floor(n/2)];
+  })();
+  res.json({ bugs: cerrados, mttr_promedio: promedio, mttr_mediana: mediana, total_cerrados: n });
+});
+
+// ─── RENDIMIENTO DEL EQUIPO ───────────────────────────────────────────────────
+function buildRendWhere(q) {
+  const c = [], p = [];
+  if (q.equipo) { c.push("area_path LIKE ?"); p.push(`Gestion Blu\\${q.equipo}%`); }
+  if (q.area)   { c.push("area_path = ?");    p.push(q.area); }
+  return { where: c.length ? 'WHERE ' + c.join(' AND ') : '', params: p };
+}
+
+// Helper: extraer etiqueta legible del area_path (último segmento)
+function areaLabel(ap) {
+  if (!ap) return 'Sin área';
+  const parts = ap.split('\\');
+  return parts[parts.length - 1] || ap;
+}
+
+app.get('/api/indicadores/rendimiento/estimacion', authMiddleware, (req, res) => {
+  const { where, params } = buildRendWhere(req.query);
+  const rows = db.all(`
+    SELECT area_path,
+           SUM(horas_estimadas)   AS estimadas,
+           SUM(horas_completadas) AS completadas,
+           COUNT(*)               AS tasks
+    FROM datos_horas
+    ${where ? where + ' AND' : 'WHERE'} area_path != '' AND horas_estimadas > 0
+    GROUP BY area_path
+    ORDER BY area_path
+  `, params);
+
+  const areas = rows.map(r => {
+    const est  = r.estimadas   || 0;
+    const real = r.completadas || 0;
+    const desvioPct = est > 0 ? Math.round((real - est) / est * 1000) / 10 : null;
+    const precisionPct = est > 0 ? Math.round(real / est * 1000) / 10 : null;
+    return {
+      area_path:  r.area_path,
+      label:      areaLabel(r.area_path),
+      estimadas:  Math.round(est  * 10) / 10,
+      completadas:Math.round(real * 10) / 10,
+      tasks:      r.tasks,
+      desvioPct,
+      precisionPct
+    };
+  });
+
+  // KPIs globales
+  const totEst  = areas.reduce((s, r) => s + r.estimadas,   0);
+  const totReal = areas.reduce((s, r) => s + r.completadas, 0);
+  const desvioGlobal    = totEst > 0 ? Math.round((totReal - totEst) / totEst * 1000) / 10 : null;
+  const precisionGlobal = totEst > 0 ? Math.round(totReal / totEst * 1000) / 10 : null;
+
+  res.json({ areas, kpis: { estimadas: Math.round(totEst*10)/10, completadas: Math.round(totReal*10)/10, desvioGlobal, precisionGlobal } });
+});
+
+app.get('/api/indicadores/rendimiento/velocidad', authMiddleware, (req, res) => {
+  const { where, params } = buildRendWhere(req.query);
+  const rows = db.all(`
+    SELECT sprint,
+           SUM(horas_completadas) AS horas,
+           COUNT(*)               AS tasks
+    FROM datos_horas
+    ${where ? where + ' AND' : 'WHERE'} sprint != ''
+    GROUP BY sprint
+    ORDER BY sprint
+  `, params);
+
+  // Ordenar sprints numéricamente por el número al final del nombre
+  const sprintNum = s => { const m = s.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; };
+  rows.sort((a, b) => sprintNum(a.sprint) - sprintNum(b.sprint));
+
+  const promHoras = rows.length > 0
+    ? Math.round(rows.reduce((s, r) => s + r.horas, 0) / rows.length * 10) / 10
+    : 0;
+
+  res.json({ sprints: rows, promedio_horas: promHoras });
+});
+
+app.get('/api/indicadores/rendimiento/burnup', authMiddleware, (req, res) => {
+  const { where, params } = buildRendWhere(req.query);
+  const rows = db.all(`
+    SELECT sprint,
+           SUM(horas_estimadas)   AS estimadas,
+           SUM(horas_completadas) AS completadas
+    FROM datos_horas
+    ${where ? where + ' AND' : 'WHERE'} sprint != '' AND (horas_estimadas > 0 OR horas_completadas > 0)
+    GROUP BY sprint
+    ORDER BY sprint
+  `, params);
+
+  const sprintNum = s => { const m = s.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; };
+  rows.sort((a, b) => sprintNum(a.sprint) - sprintNum(b.sprint));
+
+  // Acumulado real (burn-up)
+  const totalPlan = rows.reduce((s, r) => s + (r.estimadas || 0), 0);
+  let acum = 0;
+  const sprints = rows.map(r => {
+    acum += r.completadas || 0;
+    return {
+      sprint:      r.sprint,
+      completadas: Math.round((r.completadas || 0) * 10) / 10,
+      estimadas:   Math.round((r.estimadas   || 0) * 10) / 10,
+      acumulado:   Math.round(acum * 10) / 10
+    };
+  });
+
+  res.json({ sprints, total_plan: Math.round(totalPlan * 10) / 10 });
 });
 
 // ─── HISTORIAL CSV ───────────────────────────────────────────────────────────

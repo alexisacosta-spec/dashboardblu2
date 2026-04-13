@@ -14,6 +14,32 @@ const TOOLTIPS = {
   'ini-tabla':    { title: 'Por iniciativa', body: 'Tabla con el total de horas, porcentaje del total y personas únicas por iniciativa. Haz clic en una iniciativa para ver el desglose por Epic → HU → Task.', formula: 'Σ HORAS por ID_INICIATIVA' },
   'avance-ini':   { title: '% Avance por iniciativa', body: 'Porcentaje de tasks cerradas sobre el total de tasks planificadas. El total incluye tasks en todos los estados (Closed, Active, New). El color indica el nivel de avance.', formula: 'Tasks Closed / Tasks totales × 100' },
   'delivery':     { title: 'Delivery plan', body: 'Diagrama de Gantt con la duración real de cada iniciativa. El inicio es la fecha de inicio más temprana de sus tasks, el fin es la más tardía. La línea roja marca hoy.', formula: 'Inicio = MIN(FECHA_INICIO tasks) · Fin = MAX(FECHA_FIN tasks)' },
+  // ── Lead Time KPIs ──
+  'lt-total':     { title: 'Iniciativas con datos', body: 'Número de iniciativas que tienen al menos una task con fecha de inicio y fecha de fin registradas. Sin ambas fechas no se puede calcular el lead time.', formula: 'COUNT(iniciativas) WHERE fecha_ini ≠ NULL AND fecha_fin ≠ NULL' },
+  'lt-prom':      { title: 'Lead Time Promedio', body: 'Promedio aritmético de los lead times de todas las iniciativas visibles con el filtro activo. Sensible a valores extremos; compara con la mediana para detectar outliers.', formula: 'Σ Lead Time / N iniciativas' },
+  'lt-med':       { title: 'Lead Time Mediana', body: 'Valor central al ordenar los lead times de menor a mayor. Más representativo que el promedio cuando hay iniciativas muy largas o muy cortas que distorsionan la media.', formula: 'Valor central de [Lead Times ordenados asc]' },
+  'lt-min':       { title: 'Lead Time Mínimo', body: 'La iniciativa más corta del subconjunto filtrado. Sirve como referencia del mejor caso real observado en el proyecto.', formula: 'MIN(Lead Time) sobre el filtro activo' },
+  'lt-max':       { title: 'Lead Time Máximo', body: 'La iniciativa más larga del subconjunto filtrado. Valores muy altos pueden indicar iniciativas bloqueadas o con scope excesivo.', formula: 'MAX(Lead Time) sobre el filtro activo' },
+  // ── Bugs KPIs ──
+  'bug-total':    { title: 'Total bugs registrados', body: 'Conteo de todos los ítems con Work Item Type = Bug en el CSV cargado, sin importar su estado o ambiente. Es el universo completo de bugs del proyecto.', formula: 'COUNT(*) WHERE Work Item Type = "Bug"' },
+  'bug-prod':     { title: 'Bugs en producción', body: 'Bugs cuyo ambiente es PRODUCCION, EXTERNO_PRODUCCION o GSF. Representan defectos con impacto directo en usuarios finales o sistemas productivos.', formula: 'COUNT WHERE ambiente IN (PRODUCCION, EXTERNO_PRODUCCION, GSF)' },
+  'bug-mttr':     { title: 'MTTR Promedio', body: 'Mean Time To Resolve: promedio de días transcurridos entre la fecha de creación y la fecha de cierre de los bugs resueltos. Solo incluye bugs con ambas fechas registradas.', formula: 'Σ (Closed Date − Created Date) / N bugs cerrados' },
+  'bug-ini':      { title: 'Iniciativas afectadas', body: 'Número de iniciativas distintas que tienen al menos un bug vinculado en su jerarquía (Iniciativa → Epic → HU → Bug). Mide el alcance del impacto de la calidad.', formula: 'COUNT DISTINCT id_iniciativa FROM bugs donde id_iniciativa ≠ SIN_INI' },
+  // ── Bugs · Gráficos ──
+  'bug-chart-prod':   { title: 'Bugs en producción', body: 'Distribución de bugs por ambiente. Los ambientes PRODUCCION, EXTERNO_PRODUCCION y GSF representan incidencias con impacto en usuarios reales. CALIDAD corresponde a bugs detectados antes del pase.', formula: 'COUNT(*) GROUP BY ambiente WHERE ambiente ≠ ""' },
+  'bug-chart-ini':    { title: 'Densidad bugs / Iniciativa', body: 'Número absoluto de bugs por iniciativa. La densidad (bugs/tasks) en el tooltip indica qué tan propensa a defectos es cada iniciativa en relación a su tamaño. Valores altos sugieren riesgo de calidad.', formula: 'Densidad = total_bugs / total_tasks · Top 10 por volumen' },
+  'bug-chart-sprint': { title: 'Densidad bugs / Sprint', body: 'Bugs por sprint agrupados en abiertos (New/Active) y cerrados (Closed). Permite identificar en qué sprints se introdujeron o resolvieron más defectos y evaluar la tendencia del equipo.', formula: 'COUNT(*) GROUP BY sprint · Apilado: cerrados + abiertos' },
+  'bug-chart-mttr':   { title: 'MTTR bugs (detalle)', body: 'Tabla de bugs resueltos ordenados por tiempo de resolución descendente. El MTTR (Mean Time To Resolve) refleja la velocidad de respuesta ante defectos. Bugs con > 14 días indican riesgo operativo.', formula: 'Días = Closed Date − Created Date · Solo bugs con ambas fechas' },
+  // ── Rendimiento · KPIs ──
+  'rend-precision':   { title: 'Precisión global de estimación', body: 'Qué tan cerca estuvo el equipo de estimar correctamente. 100% = estimación perfecta. Por debajo de 80% indica subestimación sistemática; por encima de 120% indica sobreestimación.', formula: 'Σ horas reales / Σ horas estimadas × 100 (sobre todas las tasks del filtro)' },
+  'rend-desvio':      { title: 'Desvío de esfuerzo', body: 'Diferencia porcentual entre horas reales y estimadas. Positivo (+) = el equipo tardó más de lo estimado (sobrecoste). Negativo (−) = terminó antes de lo planificado.', formula: '(Σ real − Σ estimado) / Σ estimado × 100' },
+  'rend-velocidad':   { title: 'Velocidad promedio', body: 'Promedio de horas completadas por sprint en el período filtrado. Métrica clave para planificar capacidad futura. Compara con sprints individuales para detectar caídas de ritmo.', formula: 'Σ horas_completadas / N sprints (del filtro activo)' },
+  'rend-burnup':      { title: 'Total estimado (Plan)', body: 'Suma de horas estimadas de todas las tasks bajo el filtro activo. Representa el alcance total planificado y sirve como meta horizontal en el gráfico burn-up.', formula: 'Σ Original Estimate de tasks en el filtro' },
+  // ── Rendimiento · Gráficos ──
+  'rend-chart-prec':  { title: 'Precisión por área', body: 'Barras horizontales con el % de precisión por célula. La línea punteada azul marca el 100% (estimación perfecta). Verde = rango aceptable (80–120%), naranja = riesgo moderado, rojo = desviación crítica.', formula: 'Σ horas_completadas / Σ horas_estimadas × 100 · por area_path' },
+  'rend-chart-desv':  { title: 'Desvío de esfuerzo por área', body: 'Muestra el porcentaje de sobre (+) o sub (−) estimación por célula. Barras rojas = el área tardó más de lo estimado. Barras verdes = terminó con menos esfuerzo del planificado.', formula: '(real − estimado) / estimado × 100 · por area_path' },
+  'rend-chart-vel':   { title: 'Velocidad por sprint', body: 'Barras de horas completadas por sprint (eje izquierdo) con línea de tasks cerradas superpuesta (eje derecho). La línea dorada horizontal muestra la velocidad promedio del período.', formula: 'Σ horas_completadas GROUP BY sprint · Tasks = COUNT WHERE estado=Closed' },
+  'rend-chart-burnup':{ title: 'Burn-up acumulado', body: 'La línea verde muestra el progreso real acumulado sprint a sprint. La línea azul punteada es la meta total (Σ estimado). Cuando ambas se tocan el alcance está completo.', formula: 'Real acumulado = Σ progresivo de horas_completadas · Meta = Σ horas_estimadas total' },
 };
 
 let _tooltipEl = null;
@@ -2327,6 +2353,11 @@ let _ltData = null;
 let chartLTDist = null, chartLTBar = null;
 
 async function loadIndicadores() {
+  // Mostrar panel activo (por defecto LT)
+  if (_indActiveTab !== 'lt') {
+    switchIndTab(_indActiveTab);
+    return;
+  }
   // UX-05: skeletons mientras carga
   document.getElementById('lt-tabla-content').innerHTML   = `<table class="tbl"><thead><tr><th>#</th><th>Iniciativa</th><th>Fecha inicio</th><th>Lead Time</th><th>Avance</th></tr></thead><tbody>${skelTable([24,180,80,60,80], 7)}</tbody></table>`;
   document.getElementById('lt-chart-dist-wrap').innerHTML = `<div style="height:180px;display:flex;align-items:center;justify-content:center"><span class="skel" style="width:80%;height:140px;border-radius:8px"></span></div>`;
@@ -2544,6 +2575,471 @@ function renderLTTabla(iniciativas) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
+}
+
+// ─── INDICADORES · BUGS ───────────────────────────────────────────────────────
+let _indActiveTab = 'lt';
+let chartBugProd = null, chartBugIni = null, chartBugSprint = null;
+
+const IND_TABS = ['lt', 'bugs', 'rend'];
+const IND_LABELS = {
+  lt:   'Indicadores · Lead Time',
+  bugs: 'Indicadores · Bugs',
+  rend: 'Indicadores · Rendimiento'
+};
+const IND_SUBS = {
+  lt:   'Métricas de proceso',
+  bugs: 'Bugs reportados · Densidad · MTTR',
+  rend: 'Precisión · Desvío · Velocidad · Burn-up'
+};
+
+function switchIndTab(tab) {
+  _indActiveTab = tab;
+  IND_TABS.forEach(t => {
+    const panel = document.getElementById(`ind-panel-${t}`);
+    const btn   = document.getElementById(`ind-tab-${t}`);
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+    if (btn)   btn.classList.toggle('active', t === tab);
+  });
+  VIEW_LABELS['indicadores'] = IND_LABELS[tab] || 'Indicadores';
+  const bcLabel = document.getElementById('global-bc-label');
+  if (bcLabel) bcLabel.textContent = VIEW_LABELS['indicadores'];
+  const pageSub = document.querySelector('#view-indicadores .page-sub');
+  if (pageSub) pageSub.textContent = IND_SUBS[tab] || '';
+  if (tab === 'bugs') loadBugs();
+  if (tab === 'rend') loadRendimiento();
+}
+
+async function loadBugs() {
+  document.getElementById('bug-kpi-total').textContent = '—';
+  document.getElementById('bug-kpi-prod').textContent  = '—';
+  document.getElementById('bug-kpi-mttr').textContent  = '—';
+  document.getElementById('bug-kpi-ini').textContent   = '—';
+  document.getElementById('bug-mttr-content').innerHTML = `<div class="loader">Cargando…</div>`;
+
+  try {
+    const [dProd, dIni, dSprint, dMttr] = await Promise.all([
+      api('/api/indicadores/bugs/produccion'),
+      api('/api/indicadores/bugs/por-iniciativa'),
+      api('/api/indicadores/bugs/por-sprint'),
+      api('/api/indicadores/bugs/mttr')
+    ]);
+
+    // KPIs
+    document.getElementById('bug-kpi-total').textContent = dProd.total;
+    const totalProd = dProd.enProduccion.reduce((s, r) => s + r.total, 0);
+    document.getElementById('bug-kpi-prod').textContent  = totalProd;
+    document.getElementById('bug-kpi-mttr').textContent  = dMttr.total_cerrados > 0 ? dMttr.mttr_promedio + 'd' : '—';
+    document.getElementById('bug-kpi-ini').textContent   = dIni.iniciativas.length;
+
+    // Gráficos
+    renderBugProd(dProd);
+    renderBugIni(dIni.iniciativas);
+    renderBugSprint(dSprint.sprints);
+    renderBugMttr(dMttr);
+  } catch(e) {
+    ['bug-chart-prod-wrap','bug-chart-ini-wrap','bug-chart-sprint-wrap','bug-mttr-content'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = `<div class="no-data">Error al cargar: ${e.message}</div>`;
+    });
+  }
+}
+
+function renderBugProd(data) {
+  const wrap = document.getElementById('bug-chart-prod-wrap');
+  wrap.innerHTML = '<canvas id="chart-bug-prod"></canvas>';
+  const ctx = document.getElementById('chart-bug-prod');
+  if (chartBugProd) { chartBugProd.destroy(); chartBugProd = null; }
+
+  if (!data.resumen.length) {
+    wrap.innerHTML = emptyState('Sin bugs registrados','Carga un CSV con bugs para ver este panel.','🐛');
+    return;
+  }
+  const ambColors = {'PRODUCCION':'#8C2A2A','EXTERNO_PRODUCCION':'#C05B2D','GSF':'#3B5EA6','CALIDAD':'#2D7A4F'};
+  chartBugProd = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: data.resumen.map(r => r.ambiente || 'Sin ambiente'),
+      datasets: [{ data: data.resumen.map(r => r.total),
+        backgroundColor: data.resumen.map(r => ambColors[r.ambiente] || '#8FA3BE'),
+        borderWidth: 2, borderColor: '#F2F5FA' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw} bug${c.raw !== 1 ? 's' : ''}` } }
+      }
+    }
+  });
+}
+
+function renderBugIni(iniciativas) {
+  const wrap = document.getElementById('bug-chart-ini-wrap');
+  wrap.innerHTML = '<canvas id="chart-bug-ini"></canvas>';
+  const ctx = document.getElementById('chart-bug-ini');
+  if (chartBugIni) { chartBugIni.destroy(); chartBugIni = null; }
+
+  if (!iniciativas.length) {
+    wrap.innerHTML = emptyState('Sin datos','Carga un CSV con bugs para ver este panel.','🐛');
+    return;
+  }
+  const top = iniciativas.slice(0, 10);
+  chartBugIni = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: top.map(r => r.nombre.length > 28 ? r.nombre.slice(0,28)+'…' : r.nombre),
+      datasets: [{ label: 'Bugs', data: top.map(r => r.total_bugs),
+        backgroundColor: '#C05B2D', borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          title: items => top[items[0].dataIndex].nombre,
+          label: c => {
+            const r = top[c.dataIndex];
+            const den = r.densidad != null ? ` · densidad: ${r.densidad}` : '';
+            return ` ${c.raw} bug${c.raw !== 1 ? 's' : ''}${den}`;
+          }
+        } }
+      },
+      scales: {
+        x: { grid: { color: '#EBF0FA' }, ticks: { font: { size: 10 }, stepSize: 1 } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderBugSprint(sprints) {
+  const wrap = document.getElementById('bug-chart-sprint-wrap');
+  wrap.innerHTML = '<canvas id="chart-bug-sprint"></canvas>';
+  const ctx = document.getElementById('chart-bug-sprint');
+  if (chartBugSprint) { chartBugSprint.destroy(); chartBugSprint = null; }
+
+  if (!sprints.length) {
+    wrap.innerHTML = emptyState('Sin datos por sprint','El CSV no tiene columna Iteration Path.','📊');
+    return;
+  }
+  chartBugSprint = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sprints.map(r => r.sprint),
+      datasets: [
+        { label: 'Cerrados', data: sprints.map(r => r.cerrados),
+          backgroundColor: '#2D7A4F', borderRadius: 4, borderSkipped: false },
+        { label: 'Abiertos', data: sprints.map(r => r.abiertos),
+          backgroundColor: '#8C2A2A', borderRadius: 4, borderSkipped: false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
+        tooltip: { mode: 'index' }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { stacked: true, grid: { color: '#EBF0FA' }, ticks: { font: { size: 10 }, stepSize: 1 } }
+      }
+    }
+  });
+}
+
+function renderBugMttr(data) {
+  const el = document.getElementById('bug-mttr-content');
+  if (!data.bugs.length) {
+    el.innerHTML = emptyState('Sin bugs cerrados','No hay bugs con fecha de cierre registrada.','✅');
+    return;
+  }
+  const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  function fmtD(s) {
+    if (!s) return '—';
+    const d = new Date(s + 'T12:00:00');
+    return `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  const rows = data.bugs.map(r => {
+    const color = r.dias > 14 ? '#8C2A2A' : r.dias > 7 ? '#8C6A1A' : '#2D7A4F';
+    return `<tr>
+      <td style="font-weight:600;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.titulo || r.id_bug}</td>
+      <td class="muted" style="font-size:11px">${r.sprint || '—'}</td>
+      <td class="muted" style="font-size:11px">${r.ambiente || '—'}</td>
+      <td class="muted" style="white-space:nowrap;font-size:11px">${fmtD(r.created_date)}</td>
+      <td class="muted" style="white-space:nowrap;font-size:11px">${fmtD(r.closed_date)}</td>
+      <td style="white-space:nowrap">
+        <span style="background:${color}18;color:${color};border:1px solid ${color}44;
+          font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">${r.dias}d</span>
+      </td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px">
+      Mediana: <strong>${data.mttr_mediana}d</strong> &nbsp;·&nbsp; Promedio: <strong>${data.mttr_promedio}d</strong> &nbsp;·&nbsp; ${data.total_cerrados} bug${data.total_cerrados !== 1 ? 's' : ''} cerrado${data.total_cerrados !== 1 ? 's' : ''}
+    </div>
+    <div style="overflow-x:auto">
+    <table class="tbl">
+      <thead><tr>
+        <th>Título</th><th>Sprint</th><th>Ambiente</th><th>Creado</th><th>Cerrado</th><th>Días</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+// ─── INDICADORES · RENDIMIENTO ────────────────────────────────────────────────
+let _rendData      = null;   // { estimacion, velocidad, burnup }
+let chartRendPrec  = null, chartRendDesv = null;
+let chartRendVel   = null, chartRendBurnup = null;
+
+async function loadRendimiento() {
+  // Reset KPIs
+  ['rend-kpi-prec','rend-kpi-desv','rend-kpi-vel','rend-kpi-plan'].forEach(id => {
+    document.getElementById(id).textContent = '—';
+  });
+  ['rend-chart-prec-wrap','rend-chart-desv-wrap','rend-chart-vel-wrap','rend-chart-burnup-wrap'].forEach(id => {
+    document.getElementById(id).innerHTML = `<div style="height:180px;display:flex;align-items:center;justify-content:center"><span class="skel" style="width:80%;height:140px;border-radius:8px"></span></div>`;
+  });
+
+  const params = buildRendParams();
+  try {
+    const [dEst, dVel, dBurnup] = await Promise.all([
+      api(`/api/indicadores/rendimiento/estimacion${params}`),
+      api(`/api/indicadores/rendimiento/velocidad${params}`),
+      api(`/api/indicadores/rendimiento/burnup${params}`)
+    ]);
+    _rendData = { estimacion: dEst, velocidad: dVel, burnup: dBurnup };
+
+    // Poblar select de áreas con los valores disponibles
+    populateRendAreaSelect(dEst.areas);
+
+    renderRendKpis(dEst, dVel, dBurnup);
+    renderRendPrec(dEst.areas);
+    renderRendDesv(dEst.areas);
+    renderRendVel(dVel.sprints);
+    renderRendBurnup(dBurnup);
+  } catch(e) {
+    ['rend-chart-prec-wrap','rend-chart-desv-wrap','rend-chart-vel-wrap','rend-chart-burnup-wrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = `<div class="no-data">Error al cargar: ${e.message}</div>`;
+    });
+  }
+}
+
+function buildRendParams() {
+  const equipo = document.getElementById('rend-fil-equipo')?.value || '';
+  const area   = document.getElementById('rend-fil-area')?.value   || '';
+  const p = [];
+  if (equipo) p.push(`equipo=${encodeURIComponent(equipo)}`);
+  if (area)   p.push(`area=${encodeURIComponent(area)}`);
+  return p.length ? '?' + p.join('&') : '';
+}
+
+function populateRendAreaSelect(areas) {
+  const sel = document.getElementById('rend-fil-area');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todas las áreas</option>' +
+    areas.map(a => `<option value="${a.area_path}"${a.area_path === current ? ' selected' : ''}>${a.label}</option>`).join('');
+}
+
+function applyRendFiltro() {
+  // Al cambiar equipo, limpiar selección de área
+  if (event?.target?.id === 'rend-fil-equipo') {
+    const sel = document.getElementById('rend-fil-area');
+    if (sel) sel.value = '';
+  }
+  loadRendimiento();
+}
+
+function renderRendKpis(dEst, dVel, dBurnup) {
+  const prec = dEst.kpis.precisionGlobal;
+  const desv = dEst.kpis.desvioGlobal;
+  const precEl = document.getElementById('rend-kpi-prec');
+  const desvEl = document.getElementById('rend-kpi-desv');
+  if (precEl) {
+    precEl.textContent = prec != null ? prec + '%' : '—';
+    precEl.style.color = prec == null ? '' : prec >= 80 && prec <= 120 ? '#2D7A4F' : prec < 60 || prec > 150 ? '#8C2A2A' : '#8C6A1A';
+  }
+  if (desvEl) {
+    desvEl.textContent = desv != null ? (desv > 0 ? '+' : '') + desv + '%' : '—';
+    desvEl.style.color = desv == null ? '' : Math.abs(desv) <= 20 ? '#2D7A4F' : Math.abs(desv) <= 50 ? '#8C6A1A' : '#8C2A2A';
+  }
+  document.getElementById('rend-kpi-vel').textContent  = dVel.promedio_horas ? dVel.promedio_horas + 'h' : '—';
+  document.getElementById('rend-kpi-plan').textContent = dBurnup.total_plan   ? dBurnup.total_plan + 'h'  : '—';
+  document.getElementById('rend-counter').textContent  = `${dEst.areas.length} área${dEst.areas.length !== 1 ? 's' : ''}`;
+}
+
+function rendPrecColor(pct) {
+  if (pct == null) return '#8FA3BE';
+  if (pct >= 80 && pct <= 120) return '#2D7A4F';
+  if (pct < 60  || pct > 150)  return '#8C2A2A';
+  return '#8C6A1A';
+}
+
+function renderRendPrec(areas) {
+  const wrap = document.getElementById('rend-chart-prec-wrap');
+  wrap.innerHTML = '<canvas id="chart-rend-prec"></canvas>';
+  if (chartRendPrec) { chartRendPrec.destroy(); chartRendPrec = null; }
+  if (!areas.length) { wrap.innerHTML = emptyState('Sin datos','Carga un CSV para ver este panel.','📊'); return; }
+
+  const ctx = document.getElementById('chart-rend-prec');
+  chartRendPrec = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: areas.map(a => a.label),
+      datasets: [{
+        label: 'Precisión (%)',
+        data: areas.map(a => a.precisionPct ?? 0),
+        backgroundColor: areas.map(a => rendPrecColor(a.precisionPct) + 'CC'),
+        borderColor:     areas.map(a => rendPrecColor(a.precisionPct)),
+        borderWidth: 1, borderRadius: 4, borderSkipped: false
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: c => {
+            const a = areas[c.dataIndex];
+            return [` Precisión: ${c.raw}%`, ` Estimado: ${a.estimadas}h · Real: ${a.completadas}h`];
+          }
+        }},
+        annotation: { annotations: {
+          line100: { type: 'line', scaleID: 'x', value: 100,
+            borderColor: '#3B5EA6', borderWidth: 1.5, borderDash: [4,4] }
+        }}
+      },
+      scales: {
+        x: { grid: { color: '#EBF0FA' }, ticks: { font: { size: 10 }, callback: v => v + '%' }, min: 0 },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderRendDesv(areas) {
+  const wrap = document.getElementById('rend-chart-desv-wrap');
+  wrap.innerHTML = '<canvas id="chart-rend-desv"></canvas>';
+  if (chartRendDesv) { chartRendDesv.destroy(); chartRendDesv = null; }
+  if (!areas.length) { wrap.innerHTML = emptyState('Sin datos','Carga un CSV para ver este panel.','📊'); return; }
+
+  const ctx = document.getElementById('chart-rend-desv');
+  chartRendDesv = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: areas.map(a => a.label),
+      datasets: [{
+        label: 'Desvío (%)',
+        data: areas.map(a => a.desvioPct ?? 0),
+        backgroundColor: areas.map(a => (a.desvioPct ?? 0) > 0 ? '#8C2A2ACC' : '#2D7A4FCC'),
+        borderColor:     areas.map(a => (a.desvioPct ?? 0) > 0 ? '#8C2A2A'   : '#2D7A4F'),
+        borderWidth: 1, borderRadius: 4, borderSkipped: false
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: c => {
+            const sign = c.raw > 0 ? '+' : '';
+            return ` Desvío: ${sign}${c.raw}%  (${c.raw > 0 ? 'sobre-estimado' : 'bajo-estimado'})`;
+          }
+        }}
+      },
+      scales: {
+        x: { grid: { color: '#EBF0FA' }, ticks: { font: { size: 10 }, callback: v => (v > 0 ? '+' : '') + v + '%' } },
+        y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderRendVel(sprints) {
+  const wrap = document.getElementById('rend-chart-vel-wrap');
+  wrap.innerHTML = '<canvas id="chart-rend-vel"></canvas>';
+  if (chartRendVel) { chartRendVel.destroy(); chartRendVel = null; }
+  if (!sprints.length) { wrap.innerHTML = emptyState('Sin datos por sprint','El CSV necesita columna Iteration Path.','📊'); return; }
+
+  const ctx = document.getElementById('chart-rend-vel');
+  const avg = sprints.reduce((s, r) => s + r.horas, 0) / sprints.length;
+  chartRendVel = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sprints.map(r => r.sprint),
+      datasets: [
+        { label: 'Horas completadas', data: sprints.map(r => Math.round(r.horas * 10) / 10),
+          backgroundColor: '#3B5EA6CC', borderColor: '#3B5EA6', borderWidth: 1,
+          borderRadius: 4, borderSkipped: false, yAxisID: 'yH' },
+        { label: 'Tasks cerradas', data: sprints.map(r => r.tasks),
+          type: 'line', borderColor: '#2D7A4F', backgroundColor: '#2D7A4F22',
+          borderWidth: 2, pointRadius: 4, fill: true, tension: 0.3, yAxisID: 'yT' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
+        tooltip: { mode: 'index' },
+        annotation: { annotations: {
+          avgLine: { type: 'line', scaleID: 'yH', value: Math.round(avg * 10) / 10,
+            borderColor: '#8C6A1A', borderWidth: 1.5, borderDash: [4,4],
+            label: { content: `Prom: ${Math.round(avg)}h`, display: true, position: 'end',
+              backgroundColor: '#8C6A1A', color: '#fff', font: { size: 9 }, padding: 3 } }
+        }}
+      },
+      scales: {
+        x:  { grid: { display: false }, ticks: { font: { size: 10 } } },
+        yH: { grid: { color: '#EBF0FA' }, ticks: { font: { size: 10 }, callback: v => v + 'h' },
+              title: { display: true, text: 'Horas', font: { size: 9 } } },
+        yT: { position: 'right', grid: { display: false },
+              ticks: { font: { size: 10 }, stepSize: 1 },
+              title: { display: true, text: 'Tasks', font: { size: 9 } } }
+      }
+    }
+  });
+}
+
+function renderRendBurnup(data) {
+  const wrap = document.getElementById('rend-chart-burnup-wrap');
+  wrap.innerHTML = '<canvas id="chart-rend-burnup"></canvas>';
+  if (chartRendBurnup) { chartRendBurnup.destroy(); chartRendBurnup = null; }
+  if (!data.sprints.length) { wrap.innerHTML = emptyState('Sin datos','Carga un CSV con sprints para ver el burn-up.','📈'); return; }
+
+  const ctx = document.getElementById('chart-rend-burnup');
+  // Línea plan: total estimado como meta horizontal
+  const planData = data.sprints.map(() => data.total_plan);
+
+  chartRendBurnup = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.sprints.map(r => r.sprint),
+      datasets: [
+        { label: 'Real acumulado', data: data.sprints.map(r => r.acumulado),
+          borderColor: '#2D7A4F', backgroundColor: '#2D7A4F22',
+          borderWidth: 2.5, pointRadius: 4, fill: true, tension: 0.3 },
+        { label: 'Plan (total estimado)', data: planData,
+          borderColor: '#3B5EA6', backgroundColor: 'transparent',
+          borderWidth: 1.5, borderDash: [6,4], pointRadius: 0, fill: false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
+        tooltip: { mode: 'index', callbacks: {
+          label: c => ` ${c.dataset.label}: ${c.raw}h`
+        }}
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#EBF0FA' }, ticks: { font: { size: 10 }, callback: v => v + 'h' }, beginAtZero: true }
+      }
+    }
+  });
 }
 
 window.onclick = e => {
