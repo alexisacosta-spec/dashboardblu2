@@ -96,8 +96,20 @@ db.run(`CREATE TABLE IF NOT EXISTS password_reset_codes (
   usado     INTEGER DEFAULT 0,
   creado_en TEXT DEFAULT (datetime('now'))
 )`);
+// Invitaciones para nuevos usuarios (token 256-bit, 48h vigencia)
+// Un usuario puede tener múltiples invitaciones (reinvitaciones); UNIQUE solo en token
+db.run(`CREATE TABLE IF NOT EXISTS invitaciones (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id   INTEGER NOT NULL,
+  token     TEXT NOT NULL UNIQUE,
+  expira_en TEXT NOT NULL,
+  usado     INTEGER DEFAULT 0,
+  creado_en TEXT DEFAULT (datetime('now'))
+)`);
 // Limpiar tokens expirados al arrancar
 db.run(`DELETE FROM token_blocklist WHERE expira < ${Math.floor(Date.now()/1000)}`);
+// Migración silenciosa: password_hash puede ser cadena vacía en cuentas pendientes
+// (SQLite acepta '' en columnas TEXT NOT NULL — el constraint solo bloquea NULL)
 
 // Tablas de configuración (persistentes — NO se borran en migraciones)
 db.run(`CREATE TABLE IF NOT EXISTS equipo (
@@ -218,6 +230,16 @@ async function enviarResetPassword(email, nombre, codigo) {
   });
 }
 
+async function enviarInvitacion(email, nombre, token, portalUrl) {
+  const link = `${portalUrl}?invite=${token}`;
+  if (DEV_MODE) { console.log(`\n✉️  INVITACIÓN para ${email}: ${link}\n`); return; }
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM, to: email,
+    subject: 'Bienvenido al Portal Canales — Activa tu cuenta',
+    html: `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:0;background:#F2F5FA;font-family:'Segoe UI',Arial,sans-serif"><table width="100%" cellpadding="0" cellspacing="0" style="background:#F2F5FA;padding:32px 0"><tr><td align="center"><table width="520" cellpadding="0" cellspacing="0"><tr><td style="background:#0D1B2E;border-radius:12px 12px 0 0;padding:28px 32px"><div style="font-size:20px;font-weight:800;color:#fff">Diners Club del Ecuador</div><div style="font-size:11px;color:rgba(255,255,255,0.5);margin-top:4px">Portal Canales · Invitación de acceso</div></td></tr><tr><td style="background:#fff;padding:36px 32px"><p style="margin:0 0 8px;font-size:16px;color:#0D1B2E">Hola <strong>${nombre}</strong>,</p><p style="margin:0 0 8px;font-size:14px;color:#5A6E8A">Has sido invitado a acceder al <strong>Portal Canales</strong> de Diners Club del Ecuador.</p><p style="margin:0 0 28px;font-size:14px;color:#5A6E8A">Haz clic en el botón para crear tu contraseña y activar tu cuenta:</p><div style="text-align:center;margin:0 0 28px"><a href="${link}" style="display:inline-block;background:#2B5FE8;color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:16px 36px;border-radius:8px">Activar mi cuenta →</a></div><div style="background:#F2F5FA;border:1px solid #D0DCF0;border-radius:8px;padding:12px 16px;font-size:11px;color:#8A9BB0;word-break:break-all"><strong>O copia este enlace en tu navegador:</strong><br>${link}</div><div style="background:#C9A84C;border-radius:8px;padding:10px 16px;text-align:center;margin-top:20px"><span style="font-size:12px;font-weight:700;color:#0D1B2E">⏱ Este enlace expira en 48 horas</span></div><p style="margin:20px 0 0;font-size:12px;color:#8A9BB0">Si no esperabas esta invitación, puedes ignorar este mensaje.</p></td></tr><tr><td style="background:#0D1B2E;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center"><p style="margin:0;font-size:11px;color:rgba(255,255,255,0.3)">Diners Club del Ecuador · Mensaje automático</p></td></tr></table></td></tr></table></body></html>`
+  });
+}
+
 // ─── HELPERS DE SEGURIDAD ─────────────────────────────────────────────────────
 
 // SEC-03: Validar fortaleza de contraseña (mayúscula, minúscula, dígito, símbolo, 8+ chars)
@@ -267,8 +289,14 @@ const vc = u => ['admin','gerente'].includes(u.perfil);
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
 app.post('/api/auth/login', authLimiter, (req, res) => {
   const { email, password } = req.body;
-  const user = db.get('SELECT * FROM usuarios WHERE email=? AND activo=1', [email?.toLowerCase().trim()]);
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+  // Buscar sin filtrar activo para distinguir pendiente vs inactivo
+  const user = db.get('SELECT * FROM usuarios WHERE email=?', [email?.toLowerCase().trim()]);
+  // Cuenta pendiente de activación (sin contraseña)
+  if (user && user.activo === 0 && !user.password_hash) {
+    db.run('INSERT INTO sesiones_log (email,evento,ip) VALUES (?,?,?)', [email,'LOGIN_PENDIENTE',req.ip]);
+    return res.status(403).json({ error: 'Tu cuenta aún no ha sido activada. Revisa tu correo para el enlace de invitación.' });
+  }
+  if (!user || user.activo === 0 || !bcrypt.compareSync(password, user.password_hash)) {
     db.run('INSERT INTO sesiones_log (email,evento,ip) VALUES (?,?,?)', [email,'LOGIN_FALLIDO',req.ip]);
     return res.status(401).json({ error: 'Credenciales incorrectas' });
   }
@@ -381,22 +409,33 @@ app.post('/api/auth/reset-password', forgotLimiter, (req, res) => {
 
 // ─── ADMIN USUARIOS ───────────────────────────────────────────────────────────
 app.get('/api/admin/usuarios', authMiddleware, adminOnly, (req, res) => {
-  res.json(db.all('SELECT id,nombre,email,perfil,activo,creado_en,ultimo_acceso FROM usuarios ORDER BY creado_en DESC'));
+  const rows = db.all('SELECT id,nombre,email,perfil,activo,password_hash,creado_en,ultimo_acceso FROM usuarios ORDER BY creado_en DESC');
+  // Marcar como pendiente si activo=0 y no tiene password (invitación no aceptada)
+  res.json(rows.map(u => ({ ...u, pendiente: u.activo === 0 && !u.password_hash, password_hash: undefined })));
 });
-app.post('/api/admin/usuarios', authMiddleware, adminOnly, (req, res) => {
-  const {nombre,email,password,perfil} = req.body;
-  if (!nombre||!email||!password||!perfil) return res.status(400).json({error:'Todos los campos son requeridos'});
+app.post('/api/admin/usuarios', authMiddleware, adminOnly, async (req, res) => {
+  const {nombre, email, perfil} = req.body;
+  if (!nombre||!email||!perfil) return res.status(400).json({error:'Nombre, email y perfil son requeridos'});
   if (!['admin','gerente','gestor'].includes(perfil)) return res.status(400).json({error:'Perfil inválido'});
-  // SEC-03: Validar fortaleza de contraseña
-  const pwError = validatePassword(password);
-  if (pwError) return res.status(400).json({ error: pwError });
+  const emailLower = email.toLowerCase().trim();
   try {
-    db.run('INSERT INTO usuarios (nombre,email,password_hash,perfil) VALUES (?,?,?,?)',
-      [nombre, email.toLowerCase().trim(), bcrypt.hashSync(password,10), perfil]);
-    // SEC-12: Auditoría de creación de usuario
-    auditLog(req.user.email, 'USUARIO_CREADO', { nuevo_email: email, perfil }, req.ip);
+    // Crear usuario inactivo sin contraseña
+    db.run('INSERT INTO usuarios (nombre,email,password_hash,perfil,activo) VALUES (?,?,?,?,0)',
+      [nombre, emailLower, '', perfil]);
+    const newUser = db.get('SELECT id FROM usuarios WHERE email=?', [emailLower]);
+    // Generar token de invitación (256-bit, 48h)
+    const token = crypto.randomBytes(32).toString('hex');
+    const expira = new Date(Date.now() + 48*60*60*1000).toISOString().replace('T',' ').split('.')[0];
+    db.run('INSERT INTO invitaciones (user_id,token,expira_en) VALUES (?,?,?)', [newUser.id, token, expira]);
+    const portalUrl = process.env.PORTAL_URL || `http://localhost:${PORT}`;
+    await enviarInvitacion(emailLower, nombre, token, portalUrl);
+    auditLog(req.user.email, 'USUARIO_INVITADO', { nuevo_email: emailLower, perfil }, req.ip);
     res.json({ok:true});
-  } catch(e) { res.status(409).json({error:'El email ya existe'}); }
+  } catch(e) {
+    if (e.message?.includes('UNIQUE')) return res.status(409).json({error:'El email ya existe'});
+    console.error('createUser error:', e.message);
+    res.status(500).json({error:'Error al crear el usuario'});
+  }
 });
 app.patch('/api/admin/usuarios/:id', authMiddleware, adminOnly, (req, res) => {
   const {activo,perfil,password} = req.body; const {id} = req.params;
@@ -420,6 +459,57 @@ app.delete('/api/admin/usuarios/:id', authMiddleware, adminOnly, (req, res) => {
   auditLog(req.user.email, 'USUARIO_ELIMINADO', { eliminado_email: target?.email }, req.ip);
   res.json({ok:true});
 });
+// Reinvitar usuario pendiente
+app.post('/api/admin/usuarios/:id/reinvitar', authMiddleware, adminOnly, async (req, res) => {
+  const { id } = req.params;
+  const user = db.get('SELECT * FROM usuarios WHERE id=?', [id]);
+  if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+  if (user.activo === 1 || user.password_hash) return res.status(400).json({ error: 'El usuario ya activó su cuenta' });
+  // Invalida invitaciones anteriores y genera nueva
+  db.run('UPDATE invitaciones SET usado=1 WHERE user_id=?', [id]);
+  const token = crypto.randomBytes(32).toString('hex');
+  const expira = new Date(Date.now() + 48*60*60*1000).toISOString().replace('T',' ').split('.')[0];
+  db.run('INSERT INTO invitaciones (user_id,token,expira_en) VALUES (?,?,?)', [id, token, expira]);
+  const portalUrl = process.env.PORTAL_URL || `http://localhost:${PORT}`;
+  await enviarInvitacion(user.email, user.nombre, token, portalUrl).catch(e => console.error('reinvite error:', e.message));
+  auditLog(req.user.email, 'USUARIO_REINVITADO', { email: user.email }, req.ip);
+  res.json({ ok: true });
+});
+
+// Endpoint público: verificar token de invitación
+app.get('/api/auth/invitacion/:token', (req, res) => {
+  const { token } = req.params;
+  const now = new Date().toISOString().replace('T',' ').split('.')[0];
+  const inv = db.get('SELECT * FROM invitaciones WHERE token=? AND usado=0 AND expira_en>?', [token, now]);
+  if (!inv) return res.status(400).json({ error: 'El enlace de invitación es inválido o ya expiró.' });
+  const user = db.get('SELECT id,nombre,email,perfil FROM usuarios WHERE id=?', [inv.user_id]);
+  if (!user) return res.status(400).json({ error: 'Usuario no encontrado.' });
+  res.json({ ok: true, nombre: user.nombre, email: user.email, perfil: user.perfil });
+});
+
+// Endpoint público: activar cuenta con contraseña propia
+app.post('/api/auth/invitacion/activar', authLimiter, (req, res) => {
+  const { token, password, confirmar_password } = req.body;
+  if (!token || !password || !confirmar_password)
+    return res.status(400).json({ error: 'Todos los campos son requeridos' });
+  if (password !== confirmar_password)
+    return res.status(400).json({ error: 'Las contraseñas no coinciden' });
+  const pwError = validatePassword(password);
+  if (pwError) return res.status(400).json({ error: pwError });
+  const now = new Date().toISOString().replace('T',' ').split('.')[0];
+  const inv = db.get('SELECT * FROM invitaciones WHERE token=? AND usado=0 AND expira_en>?', [token, now]);
+  if (!inv) return res.status(400).json({ error: 'El enlace de invitación es inválido o ya expiró.' });
+  const hash = bcrypt.hashSync(password, 10);
+  db.run('UPDATE usuarios SET password_hash=?, activo=1 WHERE id=?', [hash, inv.user_id]);
+  db.run('UPDATE invitaciones SET usado=1 WHERE id=?', [inv.id]);
+  const user = db.get('SELECT id,nombre,email,perfil FROM usuarios WHERE id=?', [inv.user_id]);
+  auditLog(user.email, 'CUENTA_ACTIVADA', null, req.ip);
+  // Generar token JWT para login inmediato
+  const jti = crypto.randomBytes(16).toString('hex');
+  const jwtToken = jwt.sign({id:user.id,email:user.email,nombre:user.nombre,perfil:user.perfil,jti}, JWT_SECRET, {expiresIn:'8h'});
+  res.json({ ok: true, token: jwtToken, user: { nombre: user.nombre, email: user.email, perfil: user.perfil } });
+});
+
 // SEC-13: Logs con filtros opcionales por email, evento, desde/hasta y límite
 app.get('/api/admin/logs', authMiddleware, adminOnly, (req, res) => {
   const { email, evento, desde, hasta, limit } = req.query;

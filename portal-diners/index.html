@@ -123,6 +123,53 @@
   </div>
 </div>
 
+<!-- ══════════════ PANTALLA INVITACIÓN ══════════════ -->
+<div class="screen" id="screen-invite">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo">
+        <svg height="40" viewBox="0 0 209 182" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M143.877,90.429 C143.841,68.075 129.865,49.007 110.18,41.451 L110.18,139.398 C129.865,131.84 143.841,112.791 143.877,90.429 Z M72.613,139.379 L72.613,41.46 C52.941,49.034 38.988,68.075 38.935,90.429 C38.988,112.773 52.941,131.805 72.613,139.379 Z M91.405,7.641 C45.687,7.658 8.649,44.71 8.636,90.429 C8.649,136.138 45.687,173.181 91.405,173.199 C137.124,173.181 174.176,136.138 174.189,90.429 C174.176,44.71 137.124,7.658 91.405,7.641 Z M91.202,181 C41.173,181.242 0,140.716 0,91.367 C0,37.443 41.173,0.157 91.202,0.165 L114.648,0.165 C164.082,0.157 209.205,37.434 209.205,91.367 C209.205,140.698 164.082,181 114.648,181 L91.202,181 Z" fill="white"/>
+</svg>
+      </div>
+      <div class="auth-title">Activar cuenta</div>
+      <div class="auth-subtitle" id="invite-subtitle">Crea tu contraseña para acceder al portal</div>
+    </div>
+    <div class="auth-body" id="invite-body">
+      <div id="invite-loading" style="text-align:center;padding:20px 0;color:var(--muted);font-size:14px">Verificando enlace…</div>
+      <div id="invite-form" style="display:none">
+        <div style="background:var(--surface2);border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:13px;color:var(--text2)">
+          Bienvenido, <strong id="invite-nombre">—</strong><br>
+          <span style="font-size:11px;color:var(--muted)" id="invite-email">—</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nueva contraseña</label>
+          <input type="password" id="inv-pass1" class="form-input" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar contraseña</label>
+          <input type="password" id="inv-pass2" class="form-input" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <div class="reset-rules">
+          <span>Mínimo 8 caracteres</span><span>·</span>
+          <span>Mayúscula y minúscula</span><span>·</span>
+          <span>Número</span><span>·</span>
+          <span>Símbolo (!@#$...)</span>
+        </div>
+        <div class="error-msg" id="inv-err" style="margin-bottom:10px"></div>
+        <button class="btn-primary" id="btn-activate" onclick="doActivateAccount()">Activar mi cuenta</button>
+      </div>
+      <div id="invite-invalid" style="display:none;text-align:center;padding:20px 0">
+        <div style="font-size:36px;margin-bottom:12px">⛔</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px">Enlace inválido o expirado</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Este enlace de invitación ya fue usado o expiró. Solicita al administrador que te reenvíe la invitación.</div>
+        <button class="btn-primary" onclick="showScreen('login')">Ir al inicio de sesión</button>
+      </div>
+    </div>
+    <div class="auth-footer">Conexión local segura · Activación de cuenta</div>
+  </div>
+</div>
+
 <!-- ══════════════ PANTALLA OTP ══════════════ -->
 <div class="screen" id="screen-otp">
   <div class="auth-card">
@@ -624,11 +671,10 @@
 <!-- MODAL NUEVO USUARIO -->
 <div class="modal-overlay" id="modal-usuario">
   <div class="modal">
-    <div class="modal-hdr"><div class="modal-title" id="modal-user-title">Nuevo usuario</div></div>
+    <div class="modal-hdr"><div class="modal-title" id="modal-user-title">Invitar usuario</div></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label">Nombre completo</label><input type="text" id="u-nombre" class="form-input" placeholder="Nombre Apellido"></div>
       <div class="form-group"><label class="form-label">Correo electrónico</label><input type="email" id="u-email" class="form-input" placeholder="correo@dinersclub.com.ec"></div>
-      <div class="form-group"><label class="form-label">Contraseña temporal</label><input type="text" id="u-pass" class="form-input" placeholder="Mínimo 8 caracteres"></div>
       <div class="form-group">
         <label class="form-label">Perfil de acceso</label>
         <select id="u-perfil" class="form-select">
@@ -640,11 +686,14 @@
       <div class="hint-box" id="modal-perfil-hint">
         <strong>Gestor:</strong> Ve horas sin costos · <strong>Gerente:</strong> Ve horas y costos · <strong>Admin:</strong> Todo + gestión de usuarios
       </div>
+      <div class="invite-info-box">
+        📧 Se enviará un enlace de invitación al correo indicado. El usuario creará su propia contraseña al activar la cuenta.
+      </div>
       <div class="error-msg" id="u-err">Error al crear el usuario</div>
     </div>
     <div class="modal-ftr">
       <button class="btn-sec" onclick="closeModal('modal-usuario')">Cancelar</button>
-      <button class="btn-pri" onclick="createUser()">Crear usuario</button>
+      <button class="btn-pri" id="btn-crear-user" onclick="createUser()">Enviar invitación</button>
     </div>
   </div>
 </div>

@@ -124,6 +124,7 @@ let resetEmail = '';
 let otpTimer = null;
 let chartMes = null, chartEmpDonut = null, chartEmpBar = null, chartCat = null;
 let allPersonas = [];
+let _inviteToken = null;
 
 const MESES = {1:'Ene',2:'Feb',3:'Mar',4:'Abr',5:'May',6:'Jun',7:'Jul',8:'Ago',9:'Sep',10:'Oct',11:'Nov',12:'Dic'};
 const BADGE_EMPRESA = {Opinno:'badge-opinno',Sofka:'badge-sofka',Byteq:'badge-byteq',Digital:'badge-digital'};
@@ -131,9 +132,81 @@ const BADGE_EMPRESA = {Opinno:'badge-opinno',Sofka:'badge-sofka',Byteq:'badge-by
 // ─── INIT ────────────────────────────────────────────────────────────────────
 window.onload = () => {
   setupOTP();
-  if (TOKEN && USER) { showDashboard(); }
-  else { showScreen('login'); }
+  // Detectar enlace de invitación en la URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const invToken = urlParams.get('invite');
+  if (invToken) {
+    _inviteToken = invToken;
+    // Limpiar la URL sin recargar
+    window.history.replaceState({}, document.title, window.location.pathname);
+    showScreen('invite');
+    handleInviteToken(invToken);
+  } else if (TOKEN && USER) {
+    showDashboard();
+  } else {
+    showScreen('login');
+  }
 };
+
+// ─── INVITACIÓN ───────────────────────────────────────────────────────────────
+async function handleInviteToken(token) {
+  const loading = document.getElementById('invite-loading');
+  const form = document.getElementById('invite-form');
+  const invalid = document.getElementById('invite-invalid');
+  try {
+    const data = await fetch(`/api/auth/invitacion/${token}`).then(r => r.json());
+    if (loading) loading.style.display = 'none';
+    if (data.ok) {
+      const nombreEl = document.getElementById('invite-nombre');
+      const emailEl = document.getElementById('invite-email');
+      if (nombreEl) nombreEl.textContent = data.nombre;
+      if (emailEl) emailEl.textContent = data.email;
+      if (form) form.style.display = '';
+    } else {
+      if (invalid) invalid.style.display = '';
+    }
+  } catch(e) {
+    if (loading) loading.style.display = 'none';
+    if (invalid) invalid.style.display = '';
+  }
+}
+
+async function doActivateAccount() {
+  const pass1 = document.getElementById('inv-pass1').value;
+  const pass2 = document.getElementById('inv-pass2').value;
+  const err = document.getElementById('inv-err');
+  const btn = document.getElementById('btn-activate');
+  err.classList.remove('show');
+  if (!pass1 || !pass2) { err.textContent = 'Ambos campos son requeridos'; err.classList.add('show'); return; }
+  if (pass1 !== pass2)  { err.textContent = 'Las contraseñas no coinciden'; err.classList.add('show'); return; }
+  btn.disabled = true; btn.textContent = 'Activando…';
+  try {
+    const res = await fetch('/api/auth/invitacion/activar', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token: _inviteToken, password: pass1, confirmar_password: pass2 })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      err.textContent = data.error || 'Error al activar la cuenta';
+      err.classList.add('show');
+      btn.disabled = false; btn.textContent = 'Activar mi cuenta';
+      return;
+    }
+    // Login automático
+    TOKEN = data.token;
+    USER = data.user;
+    localStorage.setItem('dc_token', TOKEN);
+    localStorage.setItem('dc_user', JSON.stringify(USER));
+    _inviteToken = null;
+    toast(`¡Bienvenido, ${data.user.nombre}! Tu cuenta ha sido activada.`, 'ok');
+    showDashboard();
+  } catch(e) {
+    err.textContent = 'Error de conexión';
+    err.classList.add('show');
+    btn.disabled = false; btn.textContent = 'Activar mi cuenta';
+  }
+}
 
 // ─── AUTH ────────────────────────────────────────────────────────────────────
 async function doLogin() {
@@ -1446,17 +1519,23 @@ async function loadUsuarios() {
       <td>${u.nombre}</td>
       <td class="muted" style="font-size:11px">${u.email}</td>
       <td><span class="perfil-badge perfil-${u.perfil}">${PERFILES[u.perfil]||u.perfil}</span></td>
-      <td><span class="dot ${u.activo?'dot-ok':'dot-err'}"></span> ${u.activo?'Activo':'Inactivo'}</td>
+      <td>${u.pendiente
+        ? `<span class="dot dot-pending"></span> Pendiente`
+        : `<span class="dot ${u.activo?'dot-ok':'dot-err'}"></span> ${u.activo?'Activo':'Inactivo'}`
+      }</td>
       <td class="muted" style="font-size:11px">${u.ultimo_acceso?new Date(u.ultimo_acceso).toLocaleString('es-EC'):'Nunca'}</td>
       <td style="display:flex;gap:5px;flex-wrap:wrap">
-        <button class="btn-sm" onclick="toggleUser(${u.id},${u.activo})">${u.activo?'Desactivar':'Activar'}</button>
-        ${u.email!=='admin@dinersclub.com.ec'?`<button class="btn-sm del" onclick="deleteUser(${u.id},'${u.nombre}')">Eliminar</button>`:''}
+        ${u.pendiente
+          ? `<button class="btn-sm" onclick="reinvitarUsuario(${u.id},'${u.nombre.replace(/'/g,"\\'")}')">Reinvitar</button>`
+          : `<button class="btn-sm" onclick="toggleUser(${u.id},${u.activo})">${u.activo?'Desactivar':'Activar'}</button>`
+        }
+        ${u.email!=='admin@dinersclub.com.ec'?`<button class="btn-sm del" onclick="deleteUser(${u.id},'${u.nombre.replace(/'/g,"\\'")}')">Eliminar</button>`:''}
       </td>
     </tr>`).join('');
 }
 
 function openModalNuevoUsuario() {
-  ['u-nombre','u-email','u-pass'].forEach(id => document.getElementById(id).value = '');
+  ['u-nombre','u-email'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('u-perfil').value = 'gestor';
   document.getElementById('u-err').classList.remove('show');
   document.getElementById('modal-usuario').classList.add('show');
@@ -1465,18 +1544,33 @@ function openModalNuevoUsuario() {
 async function createUser() {
   const nombre = document.getElementById('u-nombre').value.trim();
   const email = document.getElementById('u-email').value.trim();
-  const password = document.getElementById('u-pass').value;
   const perfil = document.getElementById('u-perfil').value;
   const err = document.getElementById('u-err');
+  const btn = document.getElementById('btn-crear-user');
   err.classList.remove('show');
-  if (!nombre||!email||!password) { err.textContent='Todos los campos son requeridos'; err.classList.add('show'); return; }
-  if (password.length < 8) { err.textContent='La contraseña debe tener al menos 8 caracteres'; err.classList.add('show'); return; }
+  if (!nombre||!email) { err.textContent='Nombre y correo son requeridos'; err.classList.add('show'); return; }
+  btn.disabled = true; btn.textContent = 'Enviando…';
   try {
-    await api('/api/admin/usuarios','POST',{nombre,email,password,perfil});
+    await api('/api/admin/usuarios','POST',{nombre,email,perfil});
     closeModal('modal-usuario');
-    toast(`Usuario ${nombre} creado`, 'ok');
+    toast(`Invitación enviada a ${email}`, 'ok');
     loadUsuarios();
-  } catch(e) { err.textContent=e.message||'Error al crear el usuario'; err.classList.add('show'); }
+  } catch(e) {
+    err.textContent = e.message||'Error al enviar la invitación';
+    err.classList.add('show');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Enviar invitación';
+  }
+}
+
+async function reinvitarUsuario(id, nombre) {
+  if (!confirm(`¿Reenviar invitación a ${nombre}?`)) return;
+  try {
+    await api(`/api/admin/usuarios/${id}/reinvitar`, 'POST');
+    toast(`Invitación reenviada a ${nombre}`, 'ok');
+  } catch(e) {
+    toast(e.message || 'Error al reenviar la invitación', 'err');
+  }
 }
 
 async function toggleUser(id, activo) {

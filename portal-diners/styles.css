@@ -340,7 +340,7 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 
 /* Status dots */
 .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
-.dot-ok{background:var(--success)}.dot-err{background:var(--error)}.dot-warn{background:var(--warn)}
+.dot-ok{background:var(--success)}.dot-err{background:var(--error)}.dot-warn{background:var(--warn)}.dot-pending{background:#C9A84C}
 
 /* Loader */
 .loader{text-align:center;padding:3rem;color:var(--muted);font-size:13px}
@@ -359,6 +359,9 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 /* Hint box */
 .hint-box{background:rgba(43,95,232,.07);border:1px solid rgba(43,95,232,.2);
   border-radius:var(--r);padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.6}
+/* Invite info box (modal usuario) */
+.invite-info-box{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.3);
+  border-radius:var(--r);padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:4px}
 
 /* ── UX-17: Botón hamburguesa (solo mobile) ── */
 .btn-hamburger{display:none;position:fixed;top:12px;left:12px;z-index:400;
