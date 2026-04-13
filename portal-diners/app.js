@@ -1669,22 +1669,96 @@ function renderEquipoTabla(rows, preserveSearch = false) {
   document.getElementById('equipo-tbody').innerHTML = html;
 }
 
+// ── Helpers para combos select + "Otro" ──────────────────────────────────────
+function _onComboChange(selId, txtId) {
+  const isOtro = document.getElementById(selId).value === '__otro__';
+  const txt = document.getElementById(txtId);
+  txt.style.display = isOtro ? '' : 'none';
+  if (isOtro) { txt.value = ''; txt.focus(); }
+}
+
+function _getComboVal(selId, txtId) {
+  const sel = document.getElementById(selId);
+  return sel.value === '__otro__'
+    ? document.getElementById(txtId).value.trim()
+    : sel.value;
+}
+
+function _populateEquipoDropdowns(empresa = '', rol = '') {
+  // ── Empresas: conocidas + las que ya existen en el equipo ──
+  const empKnown = [...new Set([
+    ...EMPRESAS_CONOCIDAS,
+    ...allEquipoRows.map(r => r.empresa).filter(Boolean)
+  ])].sort();
+
+  const empSel = document.getElementById('eq-empresa-sel');
+  const empTxt = document.getElementById('eq-empresa-txt');
+  empSel.innerHTML =
+    '<option value="">— Selecciona empresa —</option>' +
+    empKnown.map(e => `<option value="${e}">${e}</option>`).join('') +
+    '<option value="__otro__">Otra empresa…</option>';
+
+  if (empresa && empKnown.includes(empresa)) {
+    empSel.value = empresa;
+    empTxt.style.display = 'none';
+  } else if (empresa) {
+    empSel.value = '__otro__';
+    empTxt.value = empresa;
+    empTxt.style.display = '';
+  } else {
+    empSel.value = '';
+    empTxt.style.display = 'none';
+  }
+
+  // ── Roles: predefinidos + los que ya existen en el equipo ──
+  const rolesBase = [
+    'Arquitecto','Business Analyst','Desarrollador .NET','Desarrollador Full Stack',
+    'Desarrollador Java','Desarrollador React','DevOps','Líder Técnico','LT',
+    'Project Manager','QA','QA Automation','Scrum Master','UX/UI'
+  ];
+  const rolKnown = [...new Set([
+    ...rolesBase,
+    ...allEquipoRows.map(r => r.rol).filter(Boolean)
+  ])].sort();
+
+  const rolSel = document.getElementById('eq-rol-sel');
+  const rolTxt = document.getElementById('eq-rol-txt');
+  rolSel.innerHTML =
+    '<option value="">— Selecciona rol —</option>' +
+    rolKnown.map(r => `<option value="${r}">${r}</option>`).join('') +
+    '<option value="__otro__">Otro rol…</option>';
+
+  if (rol && rolKnown.includes(rol)) {
+    rolSel.value = rol;
+    rolTxt.style.display = 'none';
+  } else if (rol) {
+    rolSel.value = '__otro__';
+    rolTxt.value = rol;
+    rolTxt.style.display = '';
+  } else {
+    rolSel.value = '';
+    rolTxt.style.display = 'none';
+  }
+}
+
 function openModalEquipo() {
   document.getElementById('eq-id').value = '';
-  ['eq-nombre','eq-correo','eq-empresa','eq-rol'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('eq-err').textContent = '';
+  document.getElementById('eq-nombre').value = '';
+  document.getElementById('eq-correo').value = '';
+  document.getElementById('eq-err').classList.remove('show');
   document.getElementById('modal-equipo-title').textContent = 'Agregar colaborador';
+  _populateEquipoDropdowns();
   document.getElementById('modal-equipo').classList.add('show');
+  setTimeout(() => document.getElementById('eq-nombre').focus(), 80);
 }
 
 function editarEquipo(id, nombre, correo, empresa, rol) {
-  document.getElementById('eq-id').value = id;
+  document.getElementById('eq-id').value      = id;
   document.getElementById('eq-nombre').value  = nombre;
   document.getElementById('eq-correo').value  = correo;
-  document.getElementById('eq-empresa').value = empresa;
-  document.getElementById('eq-rol').value     = rol;
-  document.getElementById('eq-err').textContent = '';
+  document.getElementById('eq-err').classList.remove('show');
   document.getElementById('modal-equipo-title').textContent = 'Editar colaborador';
+  _populateEquipoDropdowns(empresa, rol);
   document.getElementById('modal-equipo').classList.add('show');
 }
 
@@ -1692,8 +1766,8 @@ async function saveEquipo() {
   const id      = document.getElementById('eq-id').value;
   const nombre  = document.getElementById('eq-nombre').value.trim();
   const correo  = document.getElementById('eq-correo').value.trim();
-  const empresa = document.getElementById('eq-empresa').value.trim();
-  const rol     = document.getElementById('eq-rol').value.trim();
+  const empresa = _getComboVal('eq-empresa-sel', 'eq-empresa-txt');
+  const rol     = _getComboVal('eq-rol-sel',     'eq-rol-txt');
   const errEl   = document.getElementById('eq-err');
   if (!nombre || !correo || !empresa || !rol) {
     errEl.textContent = 'Todos los campos son requeridos'; errEl.classList.add('show'); return;

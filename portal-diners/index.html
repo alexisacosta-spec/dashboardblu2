@@ -656,27 +656,31 @@
 <!-- Modal: Equipo -->
 <div class="modal-overlay" id="modal-equipo">
   <div class="modal">
-    <div class="modal-title" id="modal-equipo-title">Agregar colaborador</div>
-    <input id="eq-id" type="hidden" value="">
-    <div class="form-row">
-      <label class="form-label">Nombre completo</label>
-      <input id="eq-nombre" class="form-input" placeholder="Apellido, Nombre">
+    <div class="modal-hdr"><div class="modal-title" id="modal-equipo-title">Agregar colaborador</div></div>
+    <div class="modal-body">
+      <input id="eq-id" type="hidden" value="">
+      <div class="form-group">
+        <label class="form-label">Nombre completo</label>
+        <input id="eq-nombre" class="form-input" placeholder="Apellido, Nombre">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Correo (debe coincidir con ADO)</label>
+        <input id="eq-correo" class="form-input" placeholder="nombre@empresa.com" type="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Empresa</label>
+        <select id="eq-empresa-sel" class="form-select" onchange="_onComboChange('eq-empresa-sel','eq-empresa-txt')"></select>
+        <input id="eq-empresa-txt" class="form-input" placeholder="Nombre de la empresa" style="display:none;margin-top:6px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rol</label>
+        <select id="eq-rol-sel" class="form-select" onchange="_onComboChange('eq-rol-sel','eq-rol-txt')"></select>
+        <input id="eq-rol-txt" class="form-input" placeholder="Ej: Desarrollador React, QA…" style="display:none;margin-top:6px">
+      </div>
+      <div class="error-msg" id="eq-err"></div>
     </div>
-    <div class="form-row">
-      <label class="form-label">Correo (debe coincidir con ADO)</label>
-      <input id="eq-correo" class="form-input" placeholder="nombre@empresa.com" type="email">
-    </div>
-    <div class="form-row">
-      <label class="form-label">Empresa</label>
-      <input id="eq-empresa" class="form-input" placeholder="Sofka, Opinno, Byteq…">
-    </div>
-    <div class="form-row">
-      <label class="form-label">Rol</label>
-      <input id="eq-rol" class="form-input" placeholder="Desarrollador React, QA…">
-    </div>
-    <div class="modal-err" id="eq-err"></div>
-    <div class="modal-actions">
-      <button class="btn-sec" onclick="document.getElementById('modal-equipo').classList.remove('show')">Cancelar</button>
+    <div class="modal-ftr">
+      <button class="btn-sec" onclick="closeModal('modal-equipo')">Cancelar</button>
       <button class="btn-pri" onclick="saveEquipo()">Guardar</button>
     </div>
   </div>
