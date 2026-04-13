@@ -237,6 +237,13 @@
 <main class="main" id="main-content">
 
 <!-- FILTROS GLOBALES -->
+<!-- BREADCRUMB GLOBAL UX-03 -->
+<nav class="global-breadcrumb" id="global-bc" style="display:none">
+  <span class="bc-home">Portal Canales</span>
+  <span class="bc-sep">/</span>
+  <span class="bc-current" id="global-bc-label">—</span>
+</nav>
+
 <div id="filter-zone" style="margin-bottom:1.5rem;display:none">
   <div class="filter-bar">
     <select class="filter-sel" id="f-anio" onchange="applyFilters()"><option value="">Todos los años</option></select>
@@ -332,9 +339,10 @@
           <th class="th-sort num" id="th-per-horas" onclick="sortPersonas('horas')">Horas<i class="sort-arrow">↕</i></th>
           <th class="th-sort num" id="th-costo-per" onclick="sortPersonas('costo')">Costo<i class="sort-arrow">↕</i></th>
         </tr></thead>
-        <tbody id="personas-tbody"><tr><td colspan="5"><div class="loader">Cargando…</div></td></tr></tbody>
+        <tbody id="personas-tbody"></tbody>
       </table>
     </div>
+    <div id="per-pagination"></div>
   </div>
 </div>
 
@@ -578,12 +586,26 @@
 
 <!-- ── VIEW: LOGS (admin) ── -->
 <div class="view" id="view-logs">
-  <div class="topbar"><div><div class="page-title">Log de accesos</div><div class="page-sub">Últimos 100 eventos de autenticación</div></div></div>
+  <div class="topbar">
+    <div><div class="page-title">Log de accesos</div><div class="page-sub" id="logs-sub">Últimos 100 eventos de autenticación</div></div>
+    <div class="logs-filter-bar">
+      <input type="text" id="log-email" class="search-input" placeholder="Filtrar por email…" oninput="loadLogs()" style="min-width:190px">
+      <select id="log-evento" class="filter-sel" onchange="loadLogs()" style="min-width:160px">
+        <option value="">Todos los eventos</option>
+        <option value="LOGIN_OK">✅ Ingreso exitoso</option>
+        <option value="LOGIN_FALLIDO">❌ Contraseña incorrecta</option>
+        <option value="OTP_ENVIADO">📧 OTP enviado</option>
+        <option value="OTP_FALLIDO">⚠️ OTP incorrecto</option>
+        <option value="LOGOUT">🔒 Cierre de sesión</option>
+        <option value="RESET_PASSWORD">🔑 Cambio de contraseña</option>
+      </select>
+    </div>
+  </div>
   <div class="panel">
     <div class="panel-body" style="overflow-x:auto">
       <table class="tbl">
         <thead><tr><th>Fecha</th><th>Email</th><th>Evento</th><th>IP</th></tr></thead>
-        <tbody id="logs-tbody"><tr><td colspan="4"><div class="loader">Cargando…</div></td></tr></tbody>
+        <tbody id="logs-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -761,6 +783,9 @@
     <div id="modal-log-cuerpo"></div>
   </div>
 </div>
+<!-- UX-16: Gantt tooltip flotante -->
+<div class="gantt-tip" id="gantt-tip"></div>
+
 <script src="app.js"></script>
 </body>
 </html>

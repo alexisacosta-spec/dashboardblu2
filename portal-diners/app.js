@@ -61,6 +61,62 @@ function infoBtn(key) {
 }
 
 
+// ─── UX-05: SKELETON SCREENS ─────────────────────────────────────────────────
+function skelTable(widths=[80,180,60,60], rows=6) {
+  return Array.from({length:rows}, () =>
+    `<tr class="skel-tbl-row">${widths.map(w=>
+      `<td><span class="skel" style="width:${w}px;height:11px"></span></td>`).join('')}</tr>`
+  ).join('');
+}
+function skelPbars(n=5) {
+  return Array.from({length:n}, (_,i) =>
+    `<div class="skel-pbar-row">
+      <span class="skel" style="width:${90+i*22}px;height:10px"></span>
+      <div class="pbar-track" style="flex:1"><span class="skel" style="width:${80-i*8}%;height:7px;border-radius:4px;display:block"></span></div>
+      <span class="skel" style="width:32px;height:10px"></span>
+    </div>`
+  ).join('');
+}
+function skelKpi() {
+  return `<span class="skel" style="width:90px;height:32px;display:inline-block;border-radius:6px"></span>`;
+}
+
+// ─── UX-09: EMPTY STATES ─────────────────────────────────────────────────────
+function emptyState(msg, hint='', icon='📭') {
+  return `<div class="empty-state">
+    <div class="empty-state-ico">${icon}</div>
+    <div class="empty-state-msg">${msg}</div>
+    ${hint ? `<div class="empty-state-hint">${hint}</div>` : ''}
+  </div>`;
+}
+
+// ─── UX-16: GANTT TOOLTIP ────────────────────────────────────────────────────
+function showGanttTip(e, el) {
+  const t = document.getElementById('gantt-tip');
+  if (!t) return;
+  t.innerHTML = `<strong>${el.dataset.nombre||'—'}</strong>
+    <div class="gantt-tip-row">📅 <b>${el.dataset.ini||'?'}</b> → <b>${el.dataset.fin||'?'}</b></div>
+    <div class="gantt-tip-row">⏱ Lead Time: <b>${el.dataset.lt||'?'}d</b></div>
+    <div class="gantt-tip-row">✅ Avance: <b>${el.dataset.pct||'0'}%</b> (${el.dataset.cerradas||0}/${el.dataset.total||0} tasks)</div>
+    <div class="gantt-tip-row" style="margin-top:4px"><span style="background:${el.dataset.color||'#ccc'}30;color:${el.dataset.color||'#666'};border:1px solid ${el.dataset.color||'#ccc'}55;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700">${el.dataset.estado||'—'}</span></div>`;
+  t.style.display = '';
+  _posGanttTip(e);
+}
+function _posGanttTip(e) {
+  const t = document.getElementById('gantt-tip');
+  if (!t) return;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  const w = t.offsetWidth || 260, h = t.offsetHeight || 110;
+  if (x + w > window.innerWidth - 8)  x = e.clientX - w - 10;
+  if (y + h > window.innerHeight - 8) y = e.clientY - h - 10;
+  t.style.left = x + 'px';
+  t.style.top  = y + 'px';
+}
+function hideGanttTip() {
+  const t = document.getElementById('gantt-tip');
+  if (t) t.style.display = 'none';
+}
+
 let TOKEN = localStorage.getItem('dc_token');
 let USER = JSON.parse(localStorage.getItem('dc_user') || 'null');
 let currentEmail = '';
@@ -398,6 +454,14 @@ function applyFilters() {
 // Vistas que NO usan filtros globales — se oculta la barra al entrar
 const VISTAS_SIN_FILTROS = new Set(['avance','indicadores','equipo','tarifas','usuarios','historial','cargar','logs']);
 
+// UX-03: nombres de vistas para breadcrumb
+const VIEW_LABELS = {
+  resumen:'Resumen ejecutivo', iniciativas:'Por iniciativa', empresas:'Por empresa',
+  personas:'Por persona', categorias:'Por categoría', avance:'Avance y Delivery',
+  indicadores:'Indicadores · Lead Time', equipo:'Equipo', tarifas:'Tarifas',
+  cargar:'Cargar CSV', historial:'Historial CSV', usuarios:'Usuarios', logs:'Log de accesos'
+};
+
 function showView(name) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -408,6 +472,13 @@ function showView(name) {
   // Mostrar/ocultar barra de filtros según vista
   const filterZone = document.getElementById('filter-zone');
   if (filterZone) filterZone.style.display = VISTAS_SIN_FILTROS.has(name) ? 'none' : '';
+  // UX-03: Actualizar breadcrumb global
+  const bc = document.getElementById('global-bc');
+  const bcLabel = document.getElementById('global-bc-label');
+  if (bc && bcLabel) {
+    bcLabel.textContent = VIEW_LABELS[name] || name;
+    bc.style.display = '';
+  }
   renderView(name);
 }
 
@@ -423,6 +494,13 @@ function renderView(name) {
 // ─── RESUMEN ─────────────────────────────────────────────────────────────────
 async function loadResumen() {
   const q = getFilters();
+  // UX-05: Skeleton mientras cargan los datos
+  ['kpi-h','kpi-c','kpi-i','kpi-p'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = skelKpi();
+  });
+  document.getElementById('pbar-iniciativas').innerHTML = skelPbars(5);
+  document.getElementById('pbar-roles').innerHTML = skelPbars(4);
   try {
     const [kpis, mes, emp, ini, roles] = await Promise.all([
       api('/api/datos/kpis'+q), api('/api/datos/por-mes'+q),
@@ -515,7 +593,11 @@ async function loadIniciativas() {
   document.getElementById('ini-title').textContent = 'Por iniciativa';
   document.getElementById('ini-sub').textContent = 'Haz clic en una iniciativa para ver el detalle por Epics';
   document.getElementById('ini-breadcrumb').style.display = 'none';
+  _pageIni = 0; // UX-14: reset página
   const q = getFilters();
+  // UX-05: skeleton en tabla si ya existe
+  const tbody = document.getElementById('ini-tbody');
+  if (tbody) tbody.innerHTML = skelTable([60,200,100,60,50,60], 8);
   allIniciativas = await api('/api/datos/por-iniciativa'+q);
   renderIniciativasTable(allIniciativas);
 }
@@ -523,6 +605,9 @@ async function loadIniciativas() {
 function renderIniciativasTable(rows) {
   const verCostos = ['admin','gerente'].includes(USER.perfil);
   const totalH = rows.reduce((s,r)=>s+r.horas,0);
+
+  // UX-14: Guardar base filtrada para re-render en cambio de página
+  _baseIniciativas = rows;
 
   // Si el panel ya existe, solo actualizar tbody y count — no destruir el input
   const existing = document.getElementById('ini-table-panel');
@@ -556,6 +641,7 @@ function renderIniciativasTable(rows) {
             <tbody id="ini-tbody"></tbody>
           </table>
         </div>
+        <div id="ini-pagination"></div>
       </div>`;
   }
 
@@ -572,7 +658,19 @@ function renderIniciativasTable(rows) {
   const tbody = document.getElementById('ini-tbody');
   if (!tbody) return;
 
-  tbody.innerHTML = sortedRows.length ? sortedRows.map(r=>`
+  // UX-14: Paginar
+  const total    = sortedRows.length;
+  const pageRows = sortedRows.slice(_pageIni * PAGE_SIZE, (_pageIni + 1) * PAGE_SIZE);
+
+  // UX-09: Empty state mejorado si no hay resultados
+  if (!total) {
+    tbody.innerHTML = `<tr><td colspan="7">${emptyState('Sin iniciativas','Prueba ajustando los filtros de año, mes o empresa.','🔍')}</td></tr>`;
+    const pgEl = document.getElementById('ini-pagination');
+    if (pgEl) pgEl.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = pageRows.map(r=>`
     <tr>
       <td><span class="id-badge" title="ID ADO: ${r.id_iniciativa}">${r.id_iniciativa}</span></td>
       <td><button class="drill-btn" onclick="drillIniciativa('${esc(String(r.id_iniciativa))}','${esc(r.nombre_iniciativa)}')">${r.nombre_iniciativa}</button></td>
@@ -583,13 +681,17 @@ function renderIniciativasTable(rows) {
       <td class="num">${r.personas}</td>
     </tr>`).join('') +
     `<tr style="background:var(--surface);font-weight:600">
-      <td></td><td>Total</td><td></td>
+      <td></td><td>Total (${total})</td><td></td>
       <td class="num">${fmtH(totalH)}</td>
       <td class="num">100%</td>
       ${verCostos?`<td class="num">$${fmtN(rows.reduce((s,r)=>s+(r.costo||0),0))}</td>`:''}
       <td class="num">${rows.reduce((s,r)=>s+r.personas,0)}</td>
-    </tr>` :
-    `<tr><td colspan="7"><div class="no-data">Sin resultados</div></td></tr>`;
+    </tr>`;
+
+  // UX-14: Renderizar paginación
+  const pgEl = document.getElementById('ini-pagination');
+  if (pgEl) pgEl.innerHTML = renderPagination(total, _pageIni,
+    `goPageIni(${_pageIni - 1})`, `goPageIni(${_pageIni + 1})`);
 }
 
 // UX-10: Debounce — timers por cada búsqueda para no disparar en cada tecla
@@ -599,6 +701,25 @@ let _timerIni, _timerPersonas, _timerEquipo, _timerLT;
 let _sortIni      = { col: null,   dir: 1 };
 let _sortPersonas = { col: 'horas', dir: -1 };
 let _sortLT       = { col: 'lead_time', dir: -1 };
+
+// UX-14: Paginación
+const PAGE_SIZE = 25;
+let _pageIni = 0, _baseIniciativas = [];
+let _pagePer = 0, _basePersonas    = [];
+
+function renderPagination(total, page, onPrev, onNext) {
+  if (total <= PAGE_SIZE) return '';
+  const pages  = Math.ceil(total / PAGE_SIZE);
+  const from   = page * PAGE_SIZE + 1;
+  const to     = Math.min((page + 1) * PAGE_SIZE, total);
+  const prevDisabled = page === 0 ? 'disabled' : '';
+  const nextDisabled = page >= pages - 1 ? 'disabled' : '';
+  return `<div class="pagination">
+    <button class="pg-btn" ${prevDisabled} onclick="${onPrev}">‹ Anterior</button>
+    <span class="pg-info">${from}–${to} de ${total}</span>
+    <button class="pg-btn" ${nextDisabled} onclick="${onNext}">Siguiente ›</button>
+  </div>`;
+}
 
 // ── UX-13: helpers genéricos de ordenamiento ──────────────────────────────────
 function _sortRows(rows, state) {
@@ -634,7 +755,7 @@ function _toggleSort(state, col) {
 // ── Funciones públicas de sort (llamadas desde onclick) ───────────────────────
 function sortIniciativas(col) {
   _toggleSort(_sortIni, col);
-  // Re-renderizar con los datos ya filtrados en memoria (filterIniciativas los filtra)
+  _pageIni = 0; // UX-14: al cambiar orden volver a página 1
   const q = document.getElementById('ini-search')?.value?.toLowerCase() || '';
   const filtered = q
     ? allIniciativas.filter(r =>
@@ -647,6 +768,7 @@ function sortIniciativas(col) {
 
 function sortPersonas(col) {
   _toggleSort(_sortPersonas, col);
+  _pagePer = 0; // UX-14: al cambiar orden volver a página 1
   const q = document.getElementById('persona-search')?.value?.toLowerCase() || '';
   const filtered = q
     ? allPersonas.filter(r =>
@@ -657,6 +779,10 @@ function sortPersonas(col) {
   renderPersonasTable(filtered);
 }
 
+// UX-14: Funciones de navegación de página
+function goPageIni(n) { _pageIni = n; renderIniciativasTable(_baseIniciativas); }
+function goPagePer(n) { _pagePer = n; renderPersonasTable(_basePersonas); }
+
 function sortLT(col) {
   _toggleSort(_sortLT, col);
   if (_ltData) _runLTFiltro();
@@ -665,6 +791,7 @@ function sortLT(col) {
 function filterIniciativas() {
   clearTimeout(_timerIni);
   _timerIni = setTimeout(() => {
+    _pageIni = 0; // UX-14: nueva búsqueda vuelve a página 1
     const q = document.getElementById('ini-search').value.toLowerCase();
     const filtered = allIniciativas.filter(r =>
       r.nombre_iniciativa.toLowerCase().includes(q) ||
@@ -893,9 +1020,9 @@ function renderAvanceTabla(rows) {
   const sorted = [...rows].filter(r => r.nombre !== 'SIN PARENT').sort((a,b) => b.pct - a.pct);
   if (!sorted.length) {
     document.getElementById('avance-ini-content').innerHTML =
-      '<div class="no-data">Sin datos de avance<div class="no-data-action">Ve a <strong>Admin → Cargar Excel</strong> y sube el archivo para ver el avance de iniciativas.</div></div>';
+      emptyState('Sin datos de avance','Ve a <strong>Admin → Cargar Excel</strong> y sube el archivo para ver el avance de iniciativas.','📈');
     document.getElementById('delivery-content').innerHTML =
-      '<div class="no-data">Sin datos de fechas<div class="no-data-action">Carga el Excel para ver el Delivery Plan.</div></div>';
+      emptyState('Sin datos de fechas','Carga el Excel para ver el Delivery Plan con las fechas de inicio y fin.','📅');
     return;
   }
   const hdr = `<div class="avance-hdr-row av-g">
@@ -931,7 +1058,8 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
     .sort((a,b) => new Date(a.fecha_ini) - new Date(b.fecha_ini));
 
   if (!sorted.length) {
-    document.getElementById('delivery-content').innerHTML = '<div class="no-data">Sin datos de fechas disponibles</div>';
+    document.getElementById('delivery-content').innerHTML =
+      emptyState('Sin datos de fechas disponibles','No hay iniciativas con fechas de inicio y fin registradas en el rango seleccionado.','📅');
     return;
   }
 
@@ -1026,6 +1154,9 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
     const dFin  = `${fin.getDate()} ${MES[fin.getMonth()]}`;
     const cls   = clasificar(r);
 
+    // UX-16: calcular lead time para tooltip
+    const ltDays = Math.round((fin - ini) / 86400000);
+
     return `<div class="gantt-row">
       <div class="gantt-name">
         <div class="gantt-name-text" title="${r.nombre}">${r.nombre}</div>
@@ -1037,7 +1168,16 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
       <div class="gantt-track">
         ${vlines}
         <div class="gantt-today" style="left:${todayPct.toFixed(1)}%"><span class="gantt-today-lbl">hoy</span></div>
-        <div class="gantt-bar" style="left:${left.toFixed(1)}%;width:${Math.max(width,1).toFixed(1)}%;background:${cls.color};opacity:0.88">
+        <div class="gantt-bar"
+          data-nombre="${esc(r.nombre)}"
+          data-ini="${dIni}" data-fin="${dFin}"
+          data-lt="${ltDays}" data-pct="${r.pct}"
+          data-cerradas="${r.cerradas||0}" data-total="${r.total||0}"
+          data-estado="${cls.estado}" data-color="${cls.color}"
+          onmouseenter="showGanttTip(event,this)"
+          onmousemove="_posGanttTip(event)"
+          onmouseleave="hideGanttTip()"
+          style="left:${left.toFixed(1)}%;width:${Math.max(width,1).toFixed(1)}%;background:${cls.color};opacity:0.88">
           <span class="gantt-bar-lbl">${dIni} — ${dFin} · ${r.pct}%</span>
         </div>
       </div>
@@ -1064,6 +1204,9 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
 // ─── EMPRESAS ────────────────────────────────────────────────────────────────
 async function loadEmpresas() {
   const q = getFilters();
+  // UX-05: skeleton en tabla de detalle
+  const empWrap = document.getElementById('emp-table-wrap');
+  if (empWrap) empWrap.innerHTML = `<table class="tbl"><thead><tr><th>Empresa</th><th class="num">Horas</th><th class="num">% del total</th></tr></thead><tbody>${skelTable([80,50,50], 4)}</tbody></table>`;
   const [emp, heatmap] = await Promise.all([api('/api/datos/por-empresa'+q), api('/api/datos/empresa-rol'+q)]);
   _cacheEmpresas = { emp, heatmap };
   const verCostos = ['admin','gerente'].includes(USER.perfil);
@@ -1109,6 +1252,10 @@ async function loadEmpresas() {
 // ─── PERSONAS ────────────────────────────────────────────────────────────────
 async function loadPersonas() {
   const q = getFilters();
+  _pagePer = 0; // UX-14: reset página
+  // UX-05: skeleton en tabla
+  const tbody = document.getElementById('personas-tbody');
+  if (tbody) tbody.innerHTML = skelTable([160,80,100,50,60], 7);
   allPersonas = await api('/api/datos/por-persona'+q);
   _cachePersonas = allPersonas;
   const verCostos = ['admin','gerente'].includes(USER.perfil);
@@ -1119,6 +1266,9 @@ async function loadPersonas() {
 
 function renderPersonasTable(rows) {
   const verCostos = ['admin','gerente'].includes(USER.perfil);
+  // UX-14: Guardar base para re-render en cambio de página
+  _basePersonas = rows;
+
   const countEl = document.getElementById('personas-count');
   if (countEl) countEl.textContent = rows.length + ' personas';
 
@@ -1128,26 +1278,42 @@ function renderPersonasTable(rows) {
   _applySortArrows('per', _sortPersonas, Object.keys(thMap), thMap);
   const sorted = _sortRows(rows, _sortPersonas);
 
-  document.getElementById('personas-tbody').innerHTML = sorted.length ?
-    sorted.map(r=>`<tr>
-      <td>${r.nombre_persona}</td>
-      <td><span class="badge ${BADGE_EMPRESA[r.empresa]||'badge-default'}">${r.empresa}</span></td>
-      <td class="muted" style="font-size:11px">${r.rol}</td>
-      <td class="num">
-        <button class="drill-btn" style="font-variant-numeric:tabular-nums"
-          onclick="verTasksPersona('${esc(r.nombre_persona)}','${esc(r.nombre_persona)}')"
-          title="Ver tasks detalladas">
-          ${fmtH(r.horas)} h
-        </button>
-      </td>
-      ${verCostos?`<td class="num">$${fmtN(r.costo)}</td>`:''}
-    </tr>`).join('') :
-    `<tr><td colspan="5"><div class="no-data">Sin datos</div></td></tr>`;
+  const tbody = document.getElementById('personas-tbody');
+  const pgEl  = document.getElementById('per-pagination');
+
+  // UX-09: Empty state
+  if (!sorted.length) {
+    if (tbody) tbody.innerHTML = `<tr><td colspan="5">${emptyState('Sin colaboradores','Ajusta los filtros o agrega colaboradores en la sección Equipo.','👤')}</td></tr>`;
+    if (pgEl)  pgEl.innerHTML  = '';
+    return;
+  }
+
+  // UX-14: Paginar
+  const total    = sorted.length;
+  const pageRows = sorted.slice(_pagePer * PAGE_SIZE, (_pagePer + 1) * PAGE_SIZE);
+
+  if (tbody) tbody.innerHTML = pageRows.map(r=>`<tr>
+    <td>${r.nombre_persona}</td>
+    <td><span class="badge ${BADGE_EMPRESA[r.empresa]||'badge-default'}">${r.empresa}</span></td>
+    <td class="muted" style="font-size:11px">${r.rol}</td>
+    <td class="num">
+      <button class="drill-btn" style="font-variant-numeric:tabular-nums"
+        onclick="verTasksPersona('${esc(r.nombre_persona)}','${esc(r.nombre_persona)}')"
+        title="Ver tasks detalladas">
+        ${fmtH(r.horas)} h
+      </button>
+    </td>
+    ${verCostos?`<td class="num">$${fmtN(r.costo)}</td>`:''}
+  </tr>`).join('');
+
+  if (pgEl) pgEl.innerHTML = renderPagination(total, _pagePer,
+    `goPagePer(${_pagePer - 1})`, `goPagePer(${_pagePer + 1})`);
 }
 
 function filterPersonas() {
   clearTimeout(_timerPersonas);
   _timerPersonas = setTimeout(() => {
+    _pagePer = 0; // UX-14: nueva búsqueda vuelve a página 1
     const q = document.getElementById('persona-search').value.toLowerCase();
     renderPersonasTable(allPersonas.filter(r =>
       r.nombre_persona.toLowerCase().includes(q) ||
@@ -1328,9 +1494,34 @@ async function deleteUser(id, nombre) {
 
 // ─── LOGS ────────────────────────────────────────────────────────────────────
 async function loadLogs() {
-  const logs = await api('/api/admin/logs');
-  const EVT = {LOGIN_OK:'✅ Ingreso exitoso',LOGIN_FALLIDO:'❌ Contraseña incorrecta',OTP_ENVIADO:'📧 OTP enviado',OTP_FALLIDO:'⚠️ OTP incorrecto'};
-  document.getElementById('logs-tbody').innerHTML = logs.map(l=>`
+  const EVT = {
+    LOGIN_OK:'✅ Ingreso exitoso', LOGIN_FALLIDO:'❌ Contraseña incorrecta',
+    OTP_ENVIADO:'📧 OTP enviado', OTP_FALLIDO:'⚠️ OTP incorrecto',
+    LOGOUT:'🔒 Cierre de sesión', RESET_PASSWORD:'🔑 Cambio de contraseña'
+  };
+  const tbody = document.getElementById('logs-tbody');
+  // UX-05: skeleton mientras carga
+  if (tbody) tbody.innerHTML = skelTable([120,180,160,80], 8);
+
+  // UX-11: Leer filtros de la vista de logs
+  const emailFilter  = document.getElementById('log-email')?.value.trim()  || '';
+  const eventoFilter = document.getElementById('log-evento')?.value || '';
+  const qs = new URLSearchParams();
+  if (emailFilter)  qs.set('email',  emailFilter);
+  if (eventoFilter) qs.set('evento', eventoFilter);
+  const q = qs.toString() ? '?' + qs.toString() : '';
+
+  const logs = await api('/api/admin/logs' + q);
+
+  const subEl = document.getElementById('logs-sub');
+  if (subEl) subEl.textContent = logs.length + ' eventos' + (emailFilter||eventoFilter ? ' (filtrados)' : '');
+
+  if (!tbody) return;
+  if (!logs.length) {
+    tbody.innerHTML = `<tr><td colspan="4">${emptyState('Sin eventos registrados','Intenta con otros filtros o espera a que haya actividad de acceso.','📋')}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = logs.map(l=>`
     <tr>
       <td class="muted" style="font-size:11px;white-space:nowrap">${new Date(l.fecha).toLocaleString('es-EC')}</td>
       <td style="font-size:12px">${l.email||'—'}</td>
@@ -1968,9 +2159,10 @@ let _ltData = null;
 let chartLTDist = null, chartLTBar = null;
 
 async function loadIndicadores() {
-  document.getElementById('lt-tabla-content').innerHTML        = '<div class="loader">Cargando…</div>';
-  document.getElementById('lt-chart-dist-wrap').innerHTML      = '<div class="loader">Cargando…</div>';
-  document.getElementById('lt-chart-bar-wrap').innerHTML       = '<div class="loader">Cargando…</div>';
+  // UX-05: skeletons mientras carga
+  document.getElementById('lt-tabla-content').innerHTML   = `<table class="tbl"><thead><tr><th>#</th><th>Iniciativa</th><th>Fecha inicio</th><th>Lead Time</th><th>Avance</th></tr></thead><tbody>${skelTable([24,180,80,60,80], 7)}</tbody></table>`;
+  document.getElementById('lt-chart-dist-wrap').innerHTML = `<div style="height:180px;display:flex;align-items:center;justify-content:center"><span class="skel" style="width:80%;height:140px;border-radius:8px"></span></div>`;
+  document.getElementById('lt-chart-bar-wrap').innerHTML  = `<div style="height:180px;display:flex;align-items:center;justify-content:center"><span class="skel" style="width:80%;height:140px;border-radius:8px"></span></div>`;
   document.getElementById('lt-kpi-total').textContent          = '—';
   document.getElementById('lt-kpi-prom').textContent           = '—';
   document.getElementById('lt-kpi-med').textContent            = '—';
@@ -1979,9 +2171,9 @@ async function loadIndicadores() {
   try {
     _ltData = await api('/api/indicadores/lead-time');
     if (!_ltData.iniciativas.length) {
+      const es = emptyState('Sin datos de iniciativas','Ve a <strong>Admin → Cargar Excel</strong> para ver indicadores de Lead Time.','📊');
       ['lt-tabla-content','lt-chart-dist-wrap','lt-chart-bar-wrap'].forEach(id => {
-        document.getElementById(id).innerHTML =
-          '<div class="no-data">Sin datos de iniciativas<div class="no-data-action">Carga el Excel para ver los indicadores.</div></div>';
+        document.getElementById(id).innerHTML = es;
       });
       return;
     }
@@ -2139,7 +2331,7 @@ function renderLTTabla(iniciativas) {
 
   if (!sorted.length) {
     document.getElementById('lt-tabla-content').innerHTML =
-      '<div class="no-data">Sin iniciativas que coincidan con el filtro</div>';
+      emptyState('Sin iniciativas','Prueba con otro texto de búsqueda o categoría.','🔍');
     return;
   }
 

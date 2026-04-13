@@ -564,3 +564,52 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 input:focus-visible,select:focus-visible,textarea:focus-visible{
   outline:2px solid var(--gold);outline-offset:2px;border-color:var(--gold)}
 button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* ── UX-05: Skeleton screens ── */
+@keyframes shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}
+.skel{display:block;border-radius:4px;
+  background:linear-gradient(90deg,#eaf0f8 25%,#d8e4f0 50%,#eaf0f8 75%);
+  background-size:600px 100%;animation:shimmer 1.4s infinite linear}
+.skel-tbl-row td{padding:9px 10px}
+.skel-pbar-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+
+/* ── UX-09: Empty states ── */
+.empty-state{text-align:center;padding:3rem 2rem}
+.empty-state-ico{font-size:2.25rem;line-height:1;margin-bottom:.75rem;opacity:.55}
+.empty-state-msg{font-size:14px;font-weight:700;color:var(--text2);margin-bottom:.4rem}
+.empty-state-hint{font-size:12px;color:var(--muted);line-height:1.55;max-width:340px;margin:0 auto}
+.empty-state-hint strong{color:var(--text2)}
+
+/* ── UX-03: Breadcrumb global ── */
+.global-breadcrumb{display:flex;align-items:center;gap:7px;font-size:11px;
+  color:var(--muted);margin-bottom:1.125rem}
+.global-breadcrumb .bc-sep{opacity:.35;font-size:10px}
+.global-breadcrumb .bc-current{color:var(--bg-dark);font-weight:700}
+.global-breadcrumb .bc-link{background:none;border:none;padding:0;cursor:pointer;
+  font-family:'Nunito Sans',sans-serif;font-size:11px;color:var(--muted);
+  text-decoration:underline;text-decoration-color:transparent;transition:.15s}
+.global-breadcrumb .bc-link:hover{color:var(--blue-el);text-decoration-color:var(--blue-el)}
+
+/* ── UX-14: Paginación de tablas ── */
+.pagination{display:flex;align-items:center;justify-content:center;gap:14px;
+  padding:11px 1.25rem;border-top:1px solid var(--border)}
+.pg-btn{padding:5px 14px;border:1.5px solid var(--border2);border-radius:var(--r);
+  background:var(--surface2);font-family:'Nunito Sans',sans-serif;font-size:11px;
+  font-weight:700;color:var(--muted);cursor:pointer;transition:all .2s}
+.pg-btn:hover{border-color:var(--blue-el);color:var(--blue-el);background:var(--white)}
+.pg-btn:disabled{opacity:.35;cursor:default;pointer-events:none}
+.pg-info{font-size:11px;font-weight:700;color:var(--muted)}
+
+/* ── UX-16: Gantt tooltip ── */
+.gantt-tip{position:fixed;z-index:900;pointer-events:none;display:none;
+  background:var(--bg-dark);color:var(--white);border-radius:var(--r);
+  padding:10px 14px;font-size:11px;line-height:1.65;max-width:270px;
+  box-shadow:0 8px 28px rgba(0,0,0,.38)}
+.gantt-tip strong{display:block;font-size:12px;font-weight:700;margin-bottom:5px;
+  color:var(--white);line-height:1.3}
+.gantt-tip-row{color:rgba(255,255,255,.65)}
+.gantt-tip-row b{color:var(--white);font-weight:600}
+.gantt-bar{cursor:pointer}
+
+/* ── UX-11: Filtros de log de accesos ── */
+.logs-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
