@@ -137,6 +137,13 @@ function goLogin() {
 }
 
 function doLogout() {
+  // SEC-06: Invalidar el token en el servidor antes de limpiar localmente
+  if (TOKEN) {
+    fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + TOKEN }
+    }).catch(() => {}); // Ignorar errores de red — el logout local siempre procede
+  }
   localStorage.removeItem('dc_token'); localStorage.removeItem('dc_user');
   TOKEN = null; USER = null;
   showScreen('login');

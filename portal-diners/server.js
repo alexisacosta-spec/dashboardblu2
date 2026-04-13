@@ -8,6 +8,7 @@ const multer     = require('multer');
 const path       = require('path');
 const fs         = require('fs');
 const os         = require('os');
+const crypto     = require('crypto');
 const helmet     = require('helmet');
 const rateLimit  = require('express-rate-limit');
 
@@ -78,9 +79,16 @@ db.run(`CREATE TABLE IF NOT EXISTS otp_codes (
 )`);
 db.run(`CREATE TABLE IF NOT EXISTS sesiones_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER, email TEXT, evento TEXT, ip TEXT,
+  user_id INTEGER, email TEXT, evento TEXT, ip TEXT, detalle TEXT,
   fecha TEXT DEFAULT (datetime('now'))
 )`);
+// SEC-06: Tabla para invalidar tokens JWT en logout
+db.run(`CREATE TABLE IF NOT EXISTS token_blocklist (
+  jti  TEXT PRIMARY KEY,
+  expira INTEGER NOT NULL
+)`);
+// Limpiar tokens expirados al arrancar
+db.run(`DELETE FROM token_blocklist WHERE expira < ${Math.floor(Date.now()/1000)}`);
 
 // Tablas de configuración (persistentes — NO se borran en migraciones)
 db.run(`CREATE TABLE IF NOT EXISTS equipo (
@@ -192,12 +200,45 @@ async function enviarOTP(email, nombre, codigo) {
   });
 }
 
+// ─── HELPERS DE SEGURIDAD ─────────────────────────────────────────────────────
+
+// SEC-03: Validar fortaleza de contraseña (mayúscula, minúscula, dígito, símbolo, 8+ chars)
+function validatePassword(password) {
+  if (!password || password.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
+  if (!/[A-Z]/.test(password))          return 'Debe contener al menos una letra mayúscula';
+  if (!/[a-z]/.test(password))          return 'Debe contener al menos una letra minúscula';
+  if (!/[0-9]/.test(password))          return 'Debe contener al menos un número';
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password))
+    return 'Debe contener al menos un símbolo especial (!@#$%^&*...)';
+  return null; // null = válida
+}
+
+// SEC-12: Registro de auditoría para acciones sensibles
+function auditLog(email, evento, detalle, ip) {
+  try {
+    db.run(
+      `INSERT INTO sesiones_log (email, evento, ip, detalle) VALUES (?,?,?,?)`,
+      [email || '', evento, ip || '', detalle ? JSON.stringify(detalle) : null]
+    );
+  } catch(e) { console.error('auditLog error:', e.message); }
+}
+
 // ─── MIDDLEWARES ──────────────────────────────────────────────────────────────
+
+// SEC-06: authMiddleware verifica token Y que no esté en la blocklist
 function authMiddleware(req, res, next) {
   const token = req.headers['authorization']?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'No autorizado' });
-  try { req.user = jwt.verify(token, JWT_SECRET); next(); }
-  catch { res.status(401).json({ error: 'Sesión expirada' }); }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    // Verificar que el token no haya sido invalidado en logout
+    if (decoded.jti) {
+      const bloqueado = db.get('SELECT jti FROM token_blocklist WHERE jti=?', [decoded.jti]);
+      if (bloqueado) return res.status(401).json({ error: 'Sesión cerrada. Por favor inicia sesión de nuevo.' });
+    }
+    req.user = decoded;
+    next();
+  } catch { res.status(401).json({ error: 'Sesión expirada' }); }
 }
 function adminOnly(req, res, next) {
   if (req.user.perfil !== 'admin') return res.status(403).json({ error: 'Acceso denegado' });
@@ -234,8 +275,27 @@ app.post('/api/auth/verify-otp', authLimiter, (req, res) => {
   db.run('UPDATE otp_codes SET usado=1 WHERE id=?', [otp.id]);
   db.run('UPDATE usuarios SET ultimo_acceso=? WHERE id=?', [now, user.id]);
   db.run('INSERT INTO sesiones_log (user_id,email,evento,ip) VALUES (?,?,?,?)', [user.id,user.email,'LOGIN_OK',req.ip]);
-  const token = jwt.sign({id:user.id,email:user.email,nombre:user.nombre,perfil:user.perfil}, JWT_SECRET, {expiresIn:'8h'});
+  // SEC-06: Incluir jti (JWT ID único) para poder invalidar el token en logout
+  const jti = crypto.randomBytes(16).toString('hex');
+  const token = jwt.sign({id:user.id,email:user.email,nombre:user.nombre,perfil:user.perfil,jti}, JWT_SECRET, {expiresIn:'8h'});
   res.json({ ok:true, token, user:{nombre:user.nombre,email:user.email,perfil:user.perfil} });
+});
+
+// SEC-06: Endpoint de logout — invalida el token en la blocklist
+app.post('/api/auth/logout', authMiddleware, (req, res) => {
+  try {
+    if (req.user?.jti) {
+      // Guardar el jti hasta que el token expire (8h = 28800 segundos)
+      const expira = Math.floor(Date.now()/1000) + 28800;
+      db.run('INSERT OR IGNORE INTO token_blocklist (jti, expira) VALUES (?,?)', [req.user.jti, expira]);
+      // Limpiar tokens expirados de la blocklist (mantenimiento)
+      db.run(`DELETE FROM token_blocklist WHERE expira < ${Math.floor(Date.now()/1000)}`);
+    }
+    auditLog(req.user?.email, 'LOGOUT', null, req.ip);
+    res.json({ ok: true });
+  } catch(e) {
+    res.json({ ok: true }); // Logout siempre exitoso aunque falle el registro
+  }
 });
 app.post('/api/auth/resend-otp', resendLimiter, (req, res) => {
   const user = db.get('SELECT * FROM usuarios WHERE email=? AND activo=1', [req.body.email?.toLowerCase().trim()]);
@@ -256,26 +316,50 @@ app.post('/api/admin/usuarios', authMiddleware, adminOnly, (req, res) => {
   const {nombre,email,password,perfil} = req.body;
   if (!nombre||!email||!password||!perfil) return res.status(400).json({error:'Todos los campos son requeridos'});
   if (!['admin','gerente','gestor'].includes(perfil)) return res.status(400).json({error:'Perfil inválido'});
+  // SEC-03: Validar fortaleza de contraseña
+  const pwError = validatePassword(password);
+  if (pwError) return res.status(400).json({ error: pwError });
   try {
     db.run('INSERT INTO usuarios (nombre,email,password_hash,perfil) VALUES (?,?,?,?)',
       [nombre, email.toLowerCase().trim(), bcrypt.hashSync(password,10), perfil]);
+    // SEC-12: Auditoría de creación de usuario
+    auditLog(req.user.email, 'USUARIO_CREADO', { nuevo_email: email, perfil }, req.ip);
     res.json({ok:true});
   } catch(e) { res.status(409).json({error:'El email ya existe'}); }
 });
 app.patch('/api/admin/usuarios/:id', authMiddleware, adminOnly, (req, res) => {
   const {activo,perfil,password} = req.body; const {id} = req.params;
+  // SEC-03: Validar fortaleza si se cambia la contraseña
+  if (password) {
+    const pwError = validatePassword(password);
+    if (pwError) return res.status(400).json({ error: pwError });
+  }
   if (activo!==undefined) db.run('UPDATE usuarios SET activo=? WHERE id=?', [activo?1:0, id]);
   if (perfil) db.run('UPDATE usuarios SET perfil=? WHERE id=?', [perfil, id]);
   if (password) db.run('UPDATE usuarios SET password_hash=? WHERE id=?', [bcrypt.hashSync(password,10), id]);
+  // SEC-12: Auditoría de modificación de usuario
+  auditLog(req.user.email, 'USUARIO_MODIFICADO', { id, activo, perfil, cambio_password: !!password }, req.ip);
   res.json({ok:true});
 });
 app.delete('/api/admin/usuarios/:id', authMiddleware, adminOnly, (req, res) => {
   if (parseInt(req.params.id)===req.user.id) return res.status(400).json({error:'No puedes eliminar tu propia cuenta'});
+  const target = db.get('SELECT email FROM usuarios WHERE id=?', [req.params.id]);
   db.run('DELETE FROM usuarios WHERE id=?', [req.params.id]);
+  // SEC-12: Auditoría de eliminación de usuario
+  auditLog(req.user.email, 'USUARIO_ELIMINADO', { eliminado_email: target?.email }, req.ip);
   res.json({ok:true});
 });
+// SEC-13: Logs con filtros opcionales por email, evento, desde/hasta y límite
 app.get('/api/admin/logs', authMiddleware, adminOnly, (req, res) => {
-  res.json(db.all('SELECT * FROM sesiones_log ORDER BY fecha DESC LIMIT 200'));
+  const { email, evento, desde, hasta, limit } = req.query;
+  const maxLimit = Math.min(parseInt(limit)||200, 500);
+  const conds = [], params = [];
+  if (email)  { conds.push('email LIKE ?');  params.push(`%${email}%`); }
+  if (evento) { conds.push('evento = ?');    params.push(evento); }
+  if (desde)  { conds.push('fecha >= ?');    params.push(desde); }
+  if (hasta)  { conds.push('fecha <= ?');    params.push(hasta + ' 23:59:59'); }
+  const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+  res.json(db.all(`SELECT * FROM sesiones_log ${where} ORDER BY fecha DESC LIMIT ${maxLimit}`, params));
 });
 
 // ─── ADMIN EQUIPO ─────────────────────────────────────────────────────────────
@@ -414,19 +498,26 @@ app.post('/api/admin/tarifas', authMiddleware, adminOnly, (req, res) => {
   try {
     db.run('INSERT INTO tarifas (empresa,rol,tarifa) VALUES (?,?,?)',
       [empresa.trim(), rol.trim(), parseFloat(tarifa)]);
+    // SEC-12: Auditoría de creación de tarifa
+    auditLog(req.user.email, 'TARIFA_CREADA', { empresa, rol, tarifa }, req.ip);
     res.json({ok:true});
   } catch(e) { res.status(409).json({error:'Ya existe una tarifa para esa empresa + rol'}); }
 });
 app.patch('/api/admin/tarifas/:id', authMiddleware, adminOnly, (req, res) => {
   const { empresa, rol, tarifa } = req.body;
   const id = req.params.id;
-  if (empresa)          db.run('UPDATE tarifas SET empresa=? WHERE id=?', [empresa.trim(), id]);
-  if (rol)              db.run('UPDATE tarifas SET rol=?     WHERE id=?', [rol.trim(), id]);
-  if (tarifa!==undefined) db.run('UPDATE tarifas SET tarifa=? WHERE id=?', [parseFloat(tarifa), id]);
+  if (empresa)             db.run('UPDATE tarifas SET empresa=? WHERE id=?', [empresa.trim(), id]);
+  if (rol)                 db.run('UPDATE tarifas SET rol=?     WHERE id=?', [rol.trim(), id]);
+  if (tarifa!==undefined)  db.run('UPDATE tarifas SET tarifa=? WHERE id=?', [parseFloat(tarifa), id]);
+  // SEC-12: Auditoría de modificación de tarifa
+  auditLog(req.user.email, 'TARIFA_MODIFICADA', { id, empresa, rol, tarifa }, req.ip);
   res.json({ok:true});
 });
 app.delete('/api/admin/tarifas/:id', authMiddleware, adminOnly, (req, res) => {
+  const target = db.get('SELECT * FROM tarifas WHERE id=?', [req.params.id]);
   db.run('DELETE FROM tarifas WHERE id=?', [req.params.id]);
+  // SEC-12: Auditoría de eliminación de tarifa
+  auditLog(req.user.email, 'TARIFA_ELIMINADA', { empresa: target?.empresa, rol: target?.rol, tarifa: target?.tarifa }, req.ip);
   res.json({ok:true});
 });
 
@@ -692,6 +783,13 @@ app.post('/api/admin/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('a
       [req.file?.originalname || 'archivo.csv', req.user.email,
        insertadas, checkP, noValidos.length, 'ok', logError, snapHoras, snapPlan]);
 
+    // SEC-12: Auditoría de carga de CSV
+    auditLog(req.user.email, 'CSV_CARGADO', {
+      archivo: req.file?.originalname,
+      tasks: insertadas,
+      iniciativas: checkP,
+      sin_lookup: noValidos
+    }, req.ip);
     res.json({
       ok: true,
       tasks_total: tasks.length,
@@ -948,6 +1046,12 @@ app.post('/api/admin/historial-csv/:id/restaurar', authMiddleware, adminOnly, (r
     }
     db.run('COMMIT');
     console.log(`🔄 Restaurado snapshot de: ${registro.nombre_archivo}`);
+    // SEC-12: Auditoría de restauración de CSV
+    auditLog(req.user.email, 'CSV_RESTAURADO', {
+      archivo: registro.nombre_archivo,
+      tasks: horasData.length,
+      iniciativas: planData.length
+    }, req.ip);
     res.json({ ok: true, tasks: horasData.length, iniciativas: planData.length });
   } catch(e) {
     try { db.run('ROLLBACK'); } catch(_) {}
