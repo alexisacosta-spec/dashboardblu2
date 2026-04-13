@@ -8,12 +8,52 @@ const multer     = require('multer');
 const path       = require('path');
 const fs         = require('fs');
 const os         = require('os');
+const helmet     = require('helmet');
+const rateLimit  = require('express-rate-limit');
 
 const app        = express();
 const PORT       = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const DEV_MODE   = process.env.DEV_MODE === 'true';
 const DB_PATH    = path.join(__dirname, 'portal.db');
+
+// ─── SEC-02: Validar JWT_SECRET antes de arrancar ─────────────────────────────
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'dev_secret_change_me') {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('\n❌ FATAL: JWT_SECRET no está configurado. El servidor no puede arrancar en producción.\n');
+    process.exit(1);
+  }
+  console.warn('\n⚠️  ADVERTENCIA: Usando JWT_SECRET de desarrollo. No usar en producción.\n');
+}
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+
+// ─── SEC-08: Headers de seguridad HTTP (Helmet) ───────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc:  ["'self'", "'unsafe-inline'", "cdn.jsdelivr.net", "cdnjs.cloudflare.com"],
+      styleSrc:   ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+      fontSrc:    ["'self'", "fonts.gstatic.com"],
+      imgSrc:     ["'self'", "data:"],
+      connectSrc: ["'self'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+// ─── SEC-04: Rate limiting en endpoints de autenticación ─────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiados intentos. Por favor espera 15 minutos antes de intentarlo de nuevo.' }
+});
+const resendLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 3,
+  message: { error: 'Demasiadas solicitudes de reenvío. Espera un minuto.' }
+});
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
@@ -119,13 +159,21 @@ if (!colsHist.includes('log_error')) {
   db.run("ALTER TABLE historial_csv ADD COLUMN log_error TEXT");
 }
 
-// Admin por defecto
-const adminExiste = db.get('SELECT id FROM usuarios WHERE email = ?', ['alexis.acosta@centrohub.co']);
-if (!adminExiste) {
-  const hash = bcrypt.hashSync('Admin2026!', 10);
-  db.run('INSERT INTO usuarios (nombre,email,password_hash,perfil) VALUES (?,?,?,?)',
-    ['Alexis Acosta','alexis.acosta@centrohub.co',hash,'admin']);
-  console.log('\n✅ Usuario admin creado: alexis.acosta@centrohub.co / Admin2026!\n');
+// ─── SEC-01: Admin inicial desde variables de entorno (nunca hardcodeado) ─────
+const ADMIN_EMAIL    = process.env.ADMIN_EMAIL;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_NOMBRE   = process.env.ADMIN_NOMBRE || 'Administrador';
+
+if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+  console.warn('⚠️  ADVERTENCIA: ADMIN_EMAIL o ADMIN_PASSWORD no están en .env. No se creará el usuario admin inicial.');
+} else {
+  const adminExiste = db.get('SELECT id FROM usuarios WHERE email = ?', [ADMIN_EMAIL.toLowerCase()]);
+  if (!adminExiste) {
+    const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+    db.run('INSERT INTO usuarios (nombre,email,password_hash,perfil) VALUES (?,?,?,?)',
+      [ADMIN_NOMBRE, ADMIN_EMAIL.toLowerCase(), hash, 'admin']);
+    console.log(`\n✅ Usuario admin creado: ${ADMIN_EMAIL}\n`);
+  }
 }
 
 // ─── EMAIL ────────────────────────────────────────────────────────────────────
@@ -158,7 +206,7 @@ function adminOnly(req, res, next) {
 const vc = u => ['admin','gerente'].includes(u.perfil);
 
 // ─── AUTH ─────────────────────────────────────────────────────────────────────
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authLimiter, (req, res) => {
   const { email, password } = req.body;
   const user = db.get('SELECT * FROM usuarios WHERE email=? AND activo=1', [email?.toLowerCase().trim()]);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
@@ -173,7 +221,7 @@ app.post('/api/auth/login', (req, res) => {
   db.run('INSERT INTO sesiones_log (user_id,email,evento,ip) VALUES (?,?,?,?)', [user.id,user.email,'OTP_ENVIADO',req.ip]);
   res.json({ ok: true });
 });
-app.post('/api/auth/verify-otp', (req, res) => {
+app.post('/api/auth/verify-otp', authLimiter, (req, res) => {
   const { email, codigo } = req.body;
   const user = db.get('SELECT * FROM usuarios WHERE email=? AND activo=1', [email?.toLowerCase().trim()]);
   if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
@@ -189,7 +237,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
   const token = jwt.sign({id:user.id,email:user.email,nombre:user.nombre,perfil:user.perfil}, JWT_SECRET, {expiresIn:'8h'});
   res.json({ ok:true, token, user:{nombre:user.nombre,email:user.email,perfil:user.perfil} });
 });
-app.post('/api/auth/resend-otp', (req, res) => {
+app.post('/api/auth/resend-otp', resendLimiter, (req, res) => {
   const user = db.get('SELECT * FROM usuarios WHERE email=? AND activo=1', [req.body.email?.toLowerCase().trim()]);
   if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
   db.run('DELETE FROM otp_codes WHERE user_id=?', [user.id]);
@@ -255,16 +303,43 @@ app.patch('/api/admin/equipo/:id', authMiddleware, adminOnly, (req, res) => {
 });
 // Sin DELETE — el equipo es histórico permanente
 
-// multer para uploads de archivos
-const upload = multer({ dest: os.tmpdir() });
+// ─── SEC-09: Multer con validación de tipo MIME y límite de tamaño ───────────
+const ALLOWED_MIME_CSV  = ['text/csv', 'text/plain', 'application/vnd.ms-excel', 'application/octet-stream'];
+const ALLOWED_MIME_XLSX = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                           'application/vnd.ms-excel', 'application/octet-stream'];
+
+const uploadCSV = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_CSV.includes(file.mimetype) || file.originalname.toLowerCase().endsWith('.csv')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos CSV'));
+    }
+  }
+});
+const uploadXLSX = multer({
+  dest: os.tmpdir(),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_XLSX.includes(file.mimetype) ||
+        file.originalname.toLowerCase().endsWith('.xlsx') ||
+        file.originalname.toLowerCase().endsWith('.xls')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos Excel (.xlsx / .xls)'));
+    }
+  }
+});
 
 // ─── CARGA MASIVA DE EQUIPO ───────────────────────────────────────────────────
-app.post('/api/admin/equipo/importar', authMiddleware, adminOnly, upload.single('archivo'), (req, res) => {
+app.post('/api/admin/equipo/importar', authMiddleware, adminOnly, uploadXLSX.single('archivo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No se recibió archivo' });
+  // SEC-10: Limpieza garantizada del archivo temporal en cualquier escenario
   try {
     const XLSX = require('xlsx');
     const wb = XLSX.readFile(req.file.path);
-    fs.unlinkSync(req.file.path);
 
     // Buscar la primera hoja con datos
     const ws = wb.Sheets[wb.SheetNames[0]];
@@ -323,6 +398,9 @@ app.post('/api/admin/equipo/importar', authMiddleware, adminOnly, upload.single(
   } catch(e) {
     console.error('Error importando equipo:', e);
     res.status(500).json({ error: 'Error procesando el archivo: ' + e.message });
+  } finally {
+    // SEC-10: Siempre eliminar el archivo temporal, haya o no error
+    if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch(_) {} }
   }
 });
 
@@ -380,13 +458,12 @@ function parseFecha(val) {
   return null;
 }
 
-app.post('/api/admin/cargar-csv', authMiddleware, adminOnly, upload.single('archivo'), (req, res) => {
+app.post('/api/admin/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('archivo'), (req, res) => {
   if (!req.file) return res.status(400).json({error:'No se recibió archivo'});
   try {
     // Leer CSV eliminando BOM si existe
     let contenido = fs.readFileSync(req.file.path, 'utf-8');
     if (contenido.charCodeAt(0) === 0xFEFF) contenido = contenido.slice(1); // strip BOM
-    fs.unlinkSync(req.file.path);
 
     // Parser CSV robusto (maneja comas dentro de comillas)
     function parseCSV(text) {
@@ -633,6 +710,9 @@ app.post('/api/admin/cargar-csv', authMiddleware, adminOnly, upload.single('arch
          0, 0, 0, 'error', e.message, null, null]);
     } catch(_) {}
     res.status(500).json({ error: 'Error procesando el archivo: ' + e.message });
+  } finally {
+    // SEC-10: Siempre eliminar el archivo temporal, haya o no error
+    if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch(_) {} }
   }
 });
 

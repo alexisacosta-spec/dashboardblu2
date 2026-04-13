@@ -1,0 +1,20 @@
+# ─── Variables de entorno (NUNCA subir al repositorio) ───
+.env
+.env.local
+.env.production
+
+# ─── Base de datos local ───
+portal-diners/portal.db
+portal-diners/portal.db-journal
+
+# ─── Dependencias ───
+node_modules/
+portal-diners/node_modules/
+
+# ─── Logs ───
+*.log
+npm-debug.log*
+
+# ─── Sistema operativo ───
+.DS_Store
+Thumbs.db
