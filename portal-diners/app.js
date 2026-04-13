@@ -2383,3 +2383,24 @@ window.onclick = e => {
     if (e.target === m) m.classList.remove('show');
   });
 };
+
+// ─── UX-17: Sidebar mobile ────────────────────────────────────────────────────
+function toggleSidebar() {
+  const sb  = document.getElementById('sidebar');
+  const btn = document.getElementById('btn-hamburger');
+  const ov  = document.getElementById('sidebar-overlay');
+  const open = sb?.classList.toggle('open');
+  btn?.classList.toggle('open', open);
+  if (ov) ov.classList.toggle('show', open);
+}
+function closeSidebar() {
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('btn-hamburger')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('show');
+}
+// Cerrar sidebar al navegar en mobile
+const _origShowView = showView;
+window.showView = function(name) {
+  _origShowView(name);
+  if (window.innerWidth <= 900) closeSidebar();
+};

@@ -163,8 +163,14 @@
 <div class="screen" id="screen-dashboard">
 <div class="dash">
 
+<!-- UX-17: Botón hamburguesa mobile -->
+<button class="btn-hamburger" id="btn-hamburger" onclick="toggleSidebar()" aria-label="Menú">
+  <span></span><span></span><span></span>
+</button>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
 <!-- SIDEBAR -->
-<nav class="sidebar">
+<nav class="sidebar" id="sidebar">
   <div class="sb-logo">
     <img src="logo-diners.svg" alt="Diners Club" style="height:20px;width:auto;opacity:0.92">
   </div>
