@@ -500,9 +500,11 @@ app.post('/api/auth/invitacion/activar', authLimiter, (req, res) => {
   const inv = db.get('SELECT * FROM invitaciones WHERE token=? AND usado=0 AND expira_en>?', [token, now]);
   if (!inv) return res.status(400).json({ error: 'El enlace de invitación es inválido o ya expiró.' });
   const hash = bcrypt.hashSync(password, 10);
-  db.run('UPDATE usuarios SET password_hash=?, activo=1 WHERE id=?', [hash, inv.user_id]);
+  const ahora = new Date().toISOString().replace('T',' ').split('.')[0];
+  db.run('UPDATE usuarios SET password_hash=?, activo=1, ultimo_acceso=? WHERE id=?', [hash, ahora, inv.user_id]);
   db.run('UPDATE invitaciones SET usado=1 WHERE id=?', [inv.id]);
   const user = db.get('SELECT id,nombre,email,perfil FROM usuarios WHERE id=?', [inv.user_id]);
+  db.run('INSERT INTO sesiones_log (user_id,email,evento,ip) VALUES (?,?,?,?)', [user.id, user.email, 'CUENTA_ACTIVADA', req.ip]);
   auditLog(user.email, 'CUENTA_ACTIVADA', null, req.ip);
   // Generar token JWT para login inmediato
   const jti = crypto.randomBytes(16).toString('hex');
