@@ -1368,6 +1368,27 @@ app.get('/api/indicadores/bugs/por-categoria', authMiddleware, (req, res) => {
   res.json({ categorias });
 });
 
+app.get('/api/indicadores/bugs/detalle', authMiddleware, (req, res) => {
+  const { where, params } = buildBugsWhere(req.query);
+  const bugs = db.all(`
+    SELECT
+      id_bug, titulo, estado, sprint, ambiente, severity, categoria_bug,
+      created_date, closed_date,
+      id_iniciativa, nombre_iniciativa,
+      id_epic,       nombre_epic,
+      id_hu,         nombre_hu,
+      CASE
+        WHEN closed_date != '' AND created_date != ''
+             AND julianday(closed_date) >= julianday(created_date)
+        THEN CAST(ROUND(julianday(closed_date) - julianday(created_date)) AS INTEGER)
+        ELSE NULL
+      END as dias_resolucion
+    FROM bugs_csv ${where}
+    ORDER BY severity, estado, nombre_iniciativa
+  `, params);
+  res.json({ bugs, total: bugs.length });
+});
+
 // ─── RENDIMIENTO DEL EQUIPO ───────────────────────────────────────────────────
 function buildRendWhere(q) {
   const c = [], p = [];

@@ -645,6 +645,28 @@ button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .gantt-tip-row b{color:var(--white);font-weight:600}
 .gantt-bar{cursor:pointer}
 
+/* ── Download button universal ── */
+.dl-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:var(--r);border:1.5px solid var(--border2);
+  background:var(--surface2);color:var(--muted);cursor:pointer;flex-shrink:0;
+  transition:all .18s;padding:0;position:relative}
+.dl-btn:hover{border-color:var(--blue-el);color:var(--blue-el);background:var(--white)}
+.dl-btn svg{width:14px;height:14px;pointer-events:none}
+
+/* ── Download dropdown menu ── */
+.dl-menu{position:fixed;z-index:9000;min-width:140px;
+  background:var(--white);border:1.5px solid var(--border2);
+  border-radius:var(--r);box-shadow:0 8px 24px rgba(13,27,46,.13);
+  overflow:hidden;opacity:0;transform:translateY(-4px);
+  transition:opacity .15s,transform .15s;pointer-events:none}
+.dl-menu.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.dl-menu-item{display:flex;align-items:center;gap:8px;padding:9px 14px;
+  font-family:'Nunito Sans',sans-serif;font-size:12px;font-weight:600;
+  color:var(--text2);cursor:pointer;transition:background .12s;white-space:nowrap}
+.dl-menu-item:hover{background:var(--surface2);color:var(--blue-el)}
+.dl-menu-item svg{width:13px;height:13px;flex-shrink:0;opacity:.7}
+.dl-menu-sep{height:1px;background:var(--border);margin:2px 0}
+
 /* ── UX-11: Filtros de log de accesos ── */
 .logs-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 
