@@ -534,12 +534,25 @@
   <!-- ── Panel: Bugs ── -->
   <div id="ind-panel-bugs" style="display:none">
 
+    <!-- Filtros -->
+    <div class="ind-filter-bar" style="margin-bottom:4px">
+      <select id="bug-fil-estado"    class="filter-sel" onchange="applyBugsFiltro()"><option value="">Todos los estados</option></select>
+      <select id="bug-fil-ambiente"  class="filter-sel" onchange="applyBugsFiltro()"><option value="">Todos los ambientes</option></select>
+      <select id="bug-fil-sprint"    class="filter-sel" onchange="applyBugsFiltro()"><option value="">Todos los sprints</option></select>
+      <select id="bug-fil-severity"  class="filter-sel" onchange="applyBugsFiltro()"><option value="">Todas las severidades</option></select>
+      <select id="bug-fil-categoria" class="filter-sel" onchange="applyBugsFiltro()"><option value="">Todas las categorías</option></select>
+      <select id="bug-fil-iniciativa" class="filter-sel" onchange="applyBugsFiltro()"><option value="">Todas las iniciativas</option></select>
+      <button class="btn-sec" onclick="clearBugsFiltros()" style="font-size:11px;padding:5px 12px">× Limpiar</button>
+    </div>
+    <div style="min-height:14px;margin-bottom:10px"></div>
+
     <!-- KPIs de bugs -->
-    <div class="kpi-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px">
+    <div class="kpi-grid" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:14px">
       <div class="kpi"><div class="kpi-label">Total bugs<span class="info-btn" onmouseenter="showTooltip('bug-total',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="bug-kpi-total">—</div><div class="kpi-sub">registrados en CSV</div></div>
       <div class="kpi"><div class="kpi-label">En producción<span class="info-btn" onmouseenter="showTooltip('bug-prod',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="bug-kpi-prod">—</div><div class="kpi-sub">PROD · EXTERNO · GSF</div></div>
       <div class="kpi"><div class="kpi-label">MTTR promedio<span class="info-btn" onmouseenter="showTooltip('bug-mttr',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="bug-kpi-mttr">—</div><div class="kpi-sub">días hasta cierre</div></div>
       <div class="kpi"><div class="kpi-label">Iniciativas afectadas<span class="info-btn" onmouseenter="showTooltip('bug-ini',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="bug-kpi-ini">—</div><div class="kpi-sub">con al menos 1 bug</div></div>
+      <div class="kpi"><div class="kpi-label">Críticos abiertos<span class="info-btn" onmouseenter="showTooltip('bug-criticos',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="bug-kpi-criticos" style="color:#8C2A2A">—</div><div class="kpi-sub">severity 1 · sin cerrar</div></div>
     </div>
 
     <!-- Fila 1: Bugs en producción + Densidad por iniciativa -->
@@ -575,6 +588,24 @@
           <div class="panel-badge">días hasta cierre · bugs resueltos</div>
         </div>
         <div class="panel-body"><div id="bug-mttr-content"><div class="loader">Cargando…</div></div></div>
+      </div>
+    </div>
+
+    <!-- Fila 3: Severidad + Tabla por categoría -->
+    <div class="row row-2" style="margin-bottom:14px">
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Severidad de bugs<span class="info-btn" onmouseenter="showTooltip('bug-chart-sev',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div>
+          <div class="panel-badge">abiertos vs cerrados · por nivel</div>
+        </div>
+        <div class="panel-body"><div class="chart-wrap" id="bug-chart-sev-wrap"><canvas id="chart-bug-sev"></canvas></div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">Bugs por categoría<span class="info-btn" onmouseenter="showTooltip('bug-chart-cat',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div>
+          <div class="panel-badge">desglose por severidad y estado</div>
+        </div>
+        <div class="panel-body"><div id="bug-cat-content"><div class="loader">Cargando…</div></div></div>
       </div>
     </div>
 

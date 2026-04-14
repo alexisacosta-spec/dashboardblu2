@@ -30,6 +30,9 @@ const TOOLTIPS = {
   'bug-chart-ini':    { title: 'Densidad bugs / Iniciativa', body: 'Número absoluto de bugs por iniciativa. La densidad (bugs/tasks) en el tooltip indica qué tan propensa a defectos es cada iniciativa en relación a su tamaño. Valores altos sugieren riesgo de calidad.', formula: 'Densidad = total_bugs / total_tasks · Top 10 por volumen' },
   'bug-chart-sprint': { title: 'Densidad bugs / Sprint', body: 'Bugs por sprint agrupados en abiertos (New/Active) y cerrados (Closed). Permite identificar en qué sprints se introdujeron o resolvieron más defectos y evaluar la tendencia del equipo.', formula: 'COUNT(*) GROUP BY sprint · Apilado: cerrados + abiertos' },
   'bug-chart-mttr':   { title: 'MTTR bugs (detalle)', body: 'Tabla de bugs resueltos ordenados por tiempo de resolución descendente. El MTTR (Mean Time To Resolve) refleja la velocidad de respuesta ante defectos. Bugs con > 14 días indican riesgo operativo.', formula: 'Días = Closed Date − Created Date · Solo bugs con ambas fechas' },
+  'bug-criticos':     { title: 'Bugs críticos abiertos', body: 'Bugs con Severity = 1 - Critical que aún no han sido cerrados. Son el riesgo más alto para el proyecto y requieren atención inmediata. El color cambia a rojo cuando hay al menos uno activo.', formula: 'COUNT WHERE severity="1 - Critical" AND estado ≠ "Closed"' },
+  'bug-chart-sev':    { title: 'Severidad de bugs', body: 'Distribución de bugs por nivel de severidad (Critical, High, Medium, Low). Las barras muestran abiertos vs cerrados por nivel. El tooltip incluye el MTTR promedio de resolución para cada nivel.', formula: 'COUNT GROUP BY severity · MTTR promedio = AVG(Closed Date − Created Date)' },
+  'bug-chart-cat':    { title: 'Bugs por categoría', body: 'Tabla que cruza Categoria_Bug con nivel de severidad. Muestra total de bugs por categoría, porcentaje resuelto y desglose por severidad. Cada celda indica abiertos (a) y cerrados (c).', formula: 'COUNT GROUP BY (categoria_bug, severity, estado)' },
   // ── Rendimiento · KPIs ──
   'rend-precision':   { title: 'Precisión global de estimación', body: 'Qué tan cerca estuvo el equipo de estimar correctamente. 100% = estimación perfecta. Por debajo de 80% indica subestimación sistemática; por encima de 120% indica sobreestimación.', formula: 'Σ horas reales / Σ horas estimadas × 100 (sobre todas las tasks del filtro)' },
   'rend-desvio':      { title: 'Desvío de esfuerzo', body: 'Diferencia porcentual entre horas reales y estimadas. Positivo (+) = el equipo tardó más de lo estimado (sobrecoste). Negativo (−) = terminó antes de lo planificado.', formula: '(Σ real − Σ estimado) / Σ estimado × 100' },
@@ -2580,7 +2583,7 @@ function renderLTTabla(iniciativas) {
 
 // ─── INDICADORES · BUGS ───────────────────────────────────────────────────────
 let _indActiveTab = 'lt';
-let chartBugProd = null, chartBugIni = null, chartBugSprint = null;
+let chartBugProd = null, chartBugIni = null, chartBugSprint = null, chartBugSev = null;
 
 const IND_TABS = ['lt', 'bugs', 'rend'];
 const IND_LABELS = {
@@ -2607,41 +2610,85 @@ function switchIndTab(tab) {
   if (bcLabel) bcLabel.textContent = VIEW_LABELS['indicadores'];
   const pageSub = document.querySelector('#view-indicadores .page-sub');
   if (pageSub) pageSub.textContent = IND_SUBS[tab] || '';
-  if (tab === 'bugs') loadBugs();
+  if (tab === 'bugs') { loadBugsFiltros(); loadBugs(); }
   if (tab === 'rend') { loadRendFiltros(); loadRendimiento(); }
 }
 
-async function loadBugs() {
-  document.getElementById('bug-kpi-total').textContent = '—';
-  document.getElementById('bug-kpi-prod').textContent  = '—';
-  document.getElementById('bug-kpi-mttr').textContent  = '—';
-  document.getElementById('bug-kpi-ini').textContent   = '—';
-  document.getElementById('bug-mttr-content').innerHTML = `<div class="loader">Cargando…</div>`;
+function buildBugsParams() {
+  const ids = ['bug-fil-estado','bug-fil-ambiente','bug-fil-sprint','bug-fil-severity','bug-fil-categoria','bug-fil-iniciativa'];
+  const keys = ['estado','ambiente','sprint','severity','categoria','iniciativa'];
+  const p = [];
+  ids.forEach((id, i) => {
+    const v = document.getElementById(id)?.value || '';
+    if (v) p.push(`${keys[i]}=${encodeURIComponent(v)}`);
+  });
+  return p.length ? '?' + p.join('&') : '';
+}
 
+async function loadBugsFiltros() {
+  function repoblar(id, opciones, placeholder) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">${placeholder}</option>` + opciones;
+    if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  }
   try {
-    const [dProd, dIni, dSprint, dMttr] = await Promise.all([
-      api('/api/indicadores/bugs/produccion'),
-      api('/api/indicadores/bugs/por-iniciativa'),
-      api('/api/indicadores/bugs/por-sprint'),
-      api('/api/indicadores/bugs/mttr')
+    const d = await api('/api/indicadores/bugs/filtros');
+    repoblar('bug-fil-estado',     d.estados.map(v    => `<option value="${v}">${v}</option>`).join(''),                         'Todos los estados');
+    repoblar('bug-fil-ambiente',   d.ambientes.map(v   => `<option value="${v}">${v}</option>`).join(''),                         'Todos los ambientes');
+    repoblar('bug-fil-sprint',     d.sprints.map(v     => `<option value="${v}">${v}</option>`).join(''),                         'Todos los sprints');
+    repoblar('bug-fil-severity',   d.severidades.map(v => `<option value="${v}">${v}</option>`).join(''),                         'Todas las severidades');
+    repoblar('bug-fil-categoria',  d.categorias.map(v  => `<option value="${v}">${v}</option>`).join(''),                         'Todas las categorías');
+    repoblar('bug-fil-iniciativa', d.iniciativas.map(i => `<option value="${i.id}">${i.nombre}</option>`).join(''),               'Todas las iniciativas');
+  } catch(e) { console.warn('loadBugsFiltros:', e.message); }
+}
+
+function applyBugsFiltro() { loadBugs(); }
+
+function clearBugsFiltros() {
+  ['bug-fil-estado','bug-fil-ambiente','bug-fil-sprint','bug-fil-severity','bug-fil-categoria','bug-fil-iniciativa']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  loadBugs();
+}
+
+async function loadBugs() {
+  const kpis = ['bug-kpi-total','bug-kpi-prod','bug-kpi-mttr','bug-kpi-ini','bug-kpi-criticos'];
+  kpis.forEach(id => { document.getElementById(id).textContent = '—'; });
+  document.getElementById('bug-mttr-content').innerHTML = `<div class="loader">Cargando…</div>`;
+  document.getElementById('bug-cat-content').innerHTML  = `<div class="loader">Cargando…</div>`;
+
+  const params = buildBugsParams();
+  try {
+    const [dProd, dIni, dSprint, dMttr, dSev, dCat] = await Promise.all([
+      api(`/api/indicadores/bugs/produccion${params}`),
+      api(`/api/indicadores/bugs/por-iniciativa${params}`),
+      api(`/api/indicadores/bugs/por-sprint${params}`),
+      api(`/api/indicadores/bugs/mttr${params}`),
+      api(`/api/indicadores/bugs/severidad${params}`),
+      api(`/api/indicadores/bugs/por-categoria${params}`)
     ]);
 
     // KPIs
-    document.getElementById('bug-kpi-total').textContent = dProd.total;
-    const totalProd = dProd.enProduccion.reduce((s, r) => s + r.total, 0);
-    document.getElementById('bug-kpi-prod').textContent  = totalProd;
-    document.getElementById('bug-kpi-mttr').textContent  = dMttr.total_cerrados > 0 ? dMttr.mttr_promedio + 'd' : '—';
-    document.getElementById('bug-kpi-ini').textContent   = dIni.iniciativas.length;
+    document.getElementById('bug-kpi-total').textContent    = dProd.total;
+    document.getElementById('bug-kpi-prod').textContent     = dProd.enProduccion.reduce((s,r) => s+r.total, 0);
+    document.getElementById('bug-kpi-mttr').textContent     = dMttr.total_cerrados > 0 ? dMttr.mttr_promedio + 'd' : '—';
+    document.getElementById('bug-kpi-ini').textContent      = dIni.iniciativas.length;
+    const critEl = document.getElementById('bug-kpi-criticos');
+    critEl.textContent = dProd.criticos ?? '—';
+    critEl.style.color = (dProd.criticos > 0) ? '#8C2A2A' : '#2D7A4F';
 
     // Gráficos
     renderBugProd(dProd);
     renderBugIni(dIni.iniciativas);
     renderBugSprint(dSprint.sprints);
     renderBugMttr(dMttr);
+    renderBugSeveridad(dSev.severidades);
+    renderBugCategoria(dCat.categorias);
   } catch(e) {
-    ['bug-chart-prod-wrap','bug-chart-ini-wrap','bug-chart-sprint-wrap','bug-mttr-content'].forEach(id => {
+    ['bug-chart-prod-wrap','bug-chart-ini-wrap','bug-chart-sprint-wrap','bug-mttr-content','bug-chart-sev-wrap','bug-cat-content'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.innerHTML = `<div class="no-data">Error al cargar: ${e.message}</div>`;
+      if (el) el.innerHTML = `<div class="no-data">Error: ${e.message}</div>`;
     });
   }
 }
@@ -2787,6 +2834,100 @@ function renderBugMttr(data) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
+}
+
+function renderBugSeveridad(severidades) {
+  const wrap = document.getElementById('bug-chart-sev-wrap');
+  wrap.innerHTML = '<canvas id="chart-bug-sev"></canvas>';
+  if (chartBugSev) { chartBugSev.destroy(); chartBugSev = null; }
+  if (!severidades.length) {
+    wrap.innerHTML = emptyState('Sin datos de severidad','El CSV necesita columna Severity.','📊');
+    return;
+  }
+  const SEV_COLOR = { '1 - Critical':'#8C2A2A', '2 - High':'#C05B2D', '3 - Medium':'#8C6A1A', '4 - Low':'#3B5EA6' };
+  const ctx = document.getElementById('chart-bug-sev');
+  chartBugSev = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: severidades.map(r => r.severity),
+      datasets: [
+        { label: 'Abiertos', data: severidades.map(r => r.abiertos),
+          backgroundColor: severidades.map(r => (SEV_COLOR[r.severity] || '#8FA3BE') + 'CC'),
+          borderColor:     severidades.map(r =>  SEV_COLOR[r.severity] || '#8FA3BE'),
+          borderWidth: 1, borderRadius: 4, borderSkipped: false },
+        { label: 'Cerrados', data: severidades.map(r => r.cerrados),
+          backgroundColor: '#2D7A4F55', borderColor: '#2D7A4F',
+          borderWidth: 1, borderRadius: 4, borderSkipped: false }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
+        tooltip: { mode: 'index', callbacks: {
+          afterBody: items => {
+            const r = severidades[items[0].dataIndex];
+            return r.mttr != null ? [`MTTR: ${r.mttr}d promedio`] : [];
+          }
+        }}
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#EBF0FA' }, ticks: { font: { size: 10 }, stepSize: 1 }, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderBugCategoria(categorias) {
+  const el = document.getElementById('bug-cat-content');
+  if (!categorias.length) {
+    el.innerHTML = emptyState('Sin datos por categoría','El CSV necesita columna Categoria_Bug.','📋');
+    return;
+  }
+  const SEV_ORDER = ['1 - Critical','2 - High','3 - Medium','4 - Low'];
+  const SEV_COLOR = { '1 - Critical':'#8C2A2A','2 - High':'#C05B2D','3 - Medium':'#8C6A1A','4 - Low':'#3B5EA6' };
+  const SEV_LABEL = { '1 - Critical':'Crítico','2 - High':'Alto','3 - Medium':'Medio','4 - Low':'Bajo' };
+  // Recoger todas las severidades presentes
+  const sevsPresentes = [...new Set(categorias.flatMap(c => Object.keys(c.bySeverity)))].sort();
+
+  const rows = categorias.map(c => {
+    const sevCells = sevsPresentes.map(sev => {
+      const d = c.bySeverity[sev] || { abiertos: 0, cerrados: 0 };
+      const tot = d.abiertos + d.cerrados;
+      if (!tot) return `<td class="muted" style="text-align:center;font-size:11px">—</td>`;
+      const col = SEV_COLOR[sev] || '#8FA3BE';
+      return `<td style="text-align:center">
+        <span style="background:${col}18;color:${col};border:1px solid ${col}44;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">${tot}</span>
+        <div style="font-size:9px;color:var(--muted);margin-top:2px">${d.abiertos}a · ${d.cerrados}c</div>
+      </td>`;
+    }).join('');
+    const pctCerrado = c.total > 0 ? Math.round(c.cerrados/c.total*100) : 0;
+    const pColor = pctCerrado >= 80 ? '#2D7A4F' : pctCerrado >= 50 ? '#8C6A1A' : '#8C2A2A';
+    return `<tr>
+      <td style="font-weight:600;font-size:12px">${c.nombre}</td>
+      <td style="text-align:center;font-weight:700;font-size:13px">${c.total}</td>
+      <td style="text-align:center">
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="lt-pbar-track" style="width:60px"><div class="lt-pbar-fill" style="width:${pctCerrado}%;background:${pColor}"></div></div>
+          <span style="font-size:11px;font-weight:700;color:${pColor}">${pctCerrado}%</span>
+        </div>
+      </td>
+      ${sevCells}
+    </tr>`;
+  }).join('');
+
+  const sevHeaders = sevsPresentes.map(s => {
+    const col = SEV_COLOR[s] || '#8FA3BE';
+    return `<th style="text-align:center"><span style="color:${col};font-weight:700">${SEV_LABEL[s]||s}</span></th>`;
+  }).join('');
+
+  el.innerHTML = `<div style="overflow-x:auto"><table class="tbl">
+    <thead><tr>
+      <th>Categoría</th><th style="text-align:center">Total</th><th>% Resuelto</th>${sevHeaders}
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
 }
 
 // ─── INDICADORES · RENDIMIENTO ────────────────────────────────────────────────
