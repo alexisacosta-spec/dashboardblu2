@@ -1330,10 +1330,22 @@ app.get('/api/indicadores/bugs/mttr', authMiddleware, (req, res) => {
 // ─── RENDIMIENTO DEL EQUIPO ───────────────────────────────────────────────────
 function buildRendWhere(q) {
   const c = [], p = [];
-  if (q.equipo) { c.push("area_path LIKE ?"); p.push(`Gestion Blu\\${q.equipo}%`); }
-  if (q.area)   { c.push("area_path = ?");    p.push(q.area); }
+  if (q.equipo) { c.push("area_path LIKE ?");  p.push(`Gestion Blu\\${q.equipo}%`); }
+  if (q.area)   { c.push("area_path = ?");      p.push(q.area); }
+  if (q.anio)   { c.push("anio = ?");           p.push(parseInt(q.anio)); }
+  if (q.mes)    { c.push("mes = ?");            p.push(parseInt(q.mes)); }
+  if (q.sprint) { c.push("sprint = ?");         p.push(q.sprint); }
   return { where: c.length ? 'WHERE ' + c.join(' AND ') : '', params: p };
 }
+
+app.get('/api/indicadores/rendimiento/filtros', authMiddleware, (req, res) => {
+  const anios   = db.all(`SELECT DISTINCT anio   FROM datos_horas WHERE anio   > 0   ORDER BY anio`).map(r => r.anio);
+  const meses   = db.all(`SELECT DISTINCT mes    FROM datos_horas WHERE mes    > 0   ORDER BY mes`).map(r => r.mes);
+  const sprints = db.all(`SELECT DISTINCT sprint FROM datos_horas WHERE sprint != '' ORDER BY sprint`).map(r => r.sprint);
+  const areas   = db.all(`SELECT DISTINCT area_path FROM datos_horas WHERE area_path != '' ORDER BY area_path`)
+                    .map(r => ({ area_path: r.area_path, label: areaLabel(r.area_path) }));
+  res.json({ anios, meses, sprints, areas });
+});
 
 // Helper: extraer etiqueta legible del area_path (último segmento)
 function areaLabel(ap) {
@@ -1377,7 +1389,11 @@ app.get('/api/indicadores/rendimiento/estimacion', authMiddleware, (req, res) =>
   const desvioGlobal    = totEst > 0 ? Math.round((totReal - totEst) / totEst * 1000) / 10 : null;
   const precisionGlobal = totEst > 0 ? Math.round(totReal / totEst * 1000) / 10 : null;
 
-  res.json({ areas, kpis: { estimadas: Math.round(totEst*10)/10, completadas: Math.round(totReal*10)/10, desvioGlobal, precisionGlobal } });
+  // Personas únicas que trabajaron bajo el filtro activo (reutiliza el mismo where)
+  const personasWhere = where ? `${where} AND correo != ''` : `WHERE correo != ''`;
+  const personas = (db.get(`SELECT COUNT(DISTINCT correo) as n FROM datos_horas ${personasWhere}`, params) || {n:0}).n;
+
+  res.json({ areas, kpis: { estimadas: Math.round(totEst*10)/10, completadas: Math.round(totReal*10)/10, desvioGlobal, precisionGlobal, personas } });
 });
 
 app.get('/api/indicadores/rendimiento/velocidad', authMiddleware, (req, res) => {

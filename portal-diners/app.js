@@ -40,6 +40,7 @@ const TOOLTIPS = {
   'rend-chart-desv':  { title: 'Desvío de esfuerzo por área', body: 'Muestra el porcentaje de sobre (+) o sub (−) estimación por célula. Barras rojas = el área tardó más de lo estimado. Barras verdes = terminó con menos esfuerzo del planificado.', formula: '(real − estimado) / estimado × 100 · por area_path' },
   'rend-chart-vel':   { title: 'Velocidad por sprint', body: 'Barras de horas completadas por sprint (eje izquierdo) con línea de tasks cerradas superpuesta (eje derecho). La línea dorada horizontal muestra la velocidad promedio del período.', formula: 'Σ horas_completadas GROUP BY sprint · Tasks = COUNT WHERE estado=Closed' },
   'rend-chart-burnup':{ title: 'Burn-up acumulado', body: 'La línea verde muestra el progreso real acumulado sprint a sprint. La línea azul punteada es la meta total (Σ estimado). Cuando ambas se tocan el alcance está completo.', formula: 'Real acumulado = Σ progresivo de horas_completadas · Meta = Σ horas_estimadas total' },
+  'rend-personas':    { title: 'Personas activas', body: 'Número de colaboradores únicos con al menos una task registrada bajo el filtro activo. Se actualiza en tiempo real al cambiar equipo, área, año, mes o sprint.', formula: 'COUNT DISTINCT correo FROM datos_horas WHERE [filtros activos]' },
 };
 
 let _tooltipEl = null;
@@ -2607,7 +2608,7 @@ function switchIndTab(tab) {
   const pageSub = document.querySelector('#view-indicadores .page-sub');
   if (pageSub) pageSub.textContent = IND_SUBS[tab] || '';
   if (tab === 'bugs') loadBugs();
-  if (tab === 'rend') loadRendimiento();
+  if (tab === 'rend') { loadRendFiltros(); loadRendimiento(); }
 }
 
 async function loadBugs() {
@@ -2810,10 +2811,6 @@ async function loadRendimiento() {
       api(`/api/indicadores/rendimiento/burnup${params}`)
     ]);
     _rendData = { estimacion: dEst, velocidad: dVel, burnup: dBurnup };
-
-    // Poblar select de áreas con los valores disponibles
-    populateRendAreaSelect(dEst.areas);
-
     renderRendKpis(dEst, dVel, dBurnup);
     renderRendPrec(dEst.areas);
     renderRendDesv(dEst.areas);
@@ -2828,29 +2825,66 @@ async function loadRendimiento() {
 }
 
 function buildRendParams() {
-  const equipo = document.getElementById('rend-fil-equipo')?.value || '';
-  const area   = document.getElementById('rend-fil-area')?.value   || '';
-  const p = [];
-  if (equipo) p.push(`equipo=${encodeURIComponent(equipo)}`);
-  if (area)   p.push(`area=${encodeURIComponent(area)}`);
+  const vals = {
+    equipo: document.getElementById('rend-fil-equipo')?.value || '',
+    area:   document.getElementById('rend-fil-area')?.value   || '',
+    anio:   document.getElementById('rend-fil-anio')?.value   || '',
+    mes:    document.getElementById('rend-fil-mes')?.value    || '',
+    sprint: document.getElementById('rend-fil-sprint')?.value || ''
+  };
+  const p = Object.entries(vals).filter(([,v]) => v).map(([k,v]) => `${k}=${encodeURIComponent(v)}`);
   return p.length ? '?' + p.join('&') : '';
 }
 
-function populateRendAreaSelect(areas) {
-  const sel = document.getElementById('rend-fil-area');
-  if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '<option value="">Todas las áreas</option>' +
-    areas.map(a => `<option value="${a.area_path}"${a.area_path === current ? ' selected' : ''}>${a.label}</option>`).join('');
+async function loadRendFiltros() {
+  const MES_NOMBRE = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  function repoblar(id, opciones, placeholder) {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">${placeholder}</option>` + opciones;
+    // Restaurar selección previa si sigue siendo válida
+    if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
+  }
+
+  try {
+    const d = await api('/api/indicadores/rendimiento/filtros');
+    repoblar('rend-fil-area',   d.areas.map(a   => `<option value="${a.area_path}">${a.label}</option>`).join(''), 'Todas las áreas');
+    repoblar('rend-fil-anio',   d.anios.map(a   => `<option value="${a}">${a}</option>`).join(''),                 'Todos los años');
+    repoblar('rend-fil-mes',    d.meses.map(m   => `<option value="${m}">${MES_NOMBRE[m] || m}</option>`).join(''), 'Todos los meses');
+    repoblar('rend-fil-sprint', d.sprints.map(s => `<option value="${s}">${s}</option>`).join(''),                 'Todos los sprints');
+  } catch(e) {
+    console.warn('loadRendFiltros error:', e.message);
+  }
 }
 
 function applyRendFiltro() {
-  // Al cambiar equipo, limpiar selección de área
-  if (event?.target?.id === 'rend-fil-equipo') {
-    const sel = document.getElementById('rend-fil-area');
-    if (sel) sel.value = '';
-  }
+  _updateRendAviso();
   loadRendimiento();
+}
+
+function clearRendFiltros() {
+  ['rend-fil-equipo','rend-fil-area','rend-fil-anio','rend-fil-mes','rend-fil-sprint'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  _updateRendAviso();
+  loadRendimiento();
+}
+
+function _updateRendAviso() {
+  const aviso = document.getElementById('rend-filtros-aviso');
+  if (!aviso) return;
+  const anio   = document.getElementById('rend-fil-anio')?.value   || '';
+  const mes    = document.getElementById('rend-fil-mes')?.value    || '';
+  const sprint = document.getElementById('rend-fil-sprint')?.value || '';
+  const MES_NOMBRE = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  const avisos = [];
+  if (mes && !anio)    avisos.push(`Mostrando ${MES_NOMBRE[parseInt(mes)] || 'mes ' + mes} de todos los años disponibles`);
+  if (sprint && anio)  avisos.push(`Filtro sprint + año activos — los datos de velocidad muestran solo este sprint`);
+  aviso.textContent = avisos.join(' · ');
 }
 
 function renderRendKpis(dEst, dVel, dBurnup) {
@@ -2866,9 +2900,10 @@ function renderRendKpis(dEst, dVel, dBurnup) {
     desvEl.textContent = desv != null ? (desv > 0 ? '+' : '') + desv + '%' : '—';
     desvEl.style.color = desv == null ? '' : Math.abs(desv) <= 20 ? '#2D7A4F' : Math.abs(desv) <= 50 ? '#8C6A1A' : '#8C2A2A';
   }
-  document.getElementById('rend-kpi-vel').textContent  = dVel.promedio_horas ? dVel.promedio_horas + 'h' : '—';
-  document.getElementById('rend-kpi-plan').textContent = dBurnup.total_plan   ? dBurnup.total_plan + 'h'  : '—';
-  document.getElementById('rend-counter').textContent  = `${dEst.areas.length} área${dEst.areas.length !== 1 ? 's' : ''}`;
+  document.getElementById('rend-kpi-vel').textContent     = dVel.promedio_horas ? dVel.promedio_horas + 'h' : '—';
+  document.getElementById('rend-kpi-plan').textContent    = dBurnup.total_plan  ? dBurnup.total_plan + 'h'  : '—';
+  document.getElementById('rend-kpi-personas').textContent = dEst.kpis.personas ?? '—';
+  document.getElementById('rend-counter').textContent     = `${dEst.areas.length} área${dEst.areas.length !== 1 ? 's' : ''}`;
 }
 
 function rendPrecColor(pct) {

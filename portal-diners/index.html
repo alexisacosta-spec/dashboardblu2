@@ -584,24 +584,28 @@
   <div id="ind-panel-rend" style="display:none">
 
     <!-- Filtros -->
-    <div class="ind-filter-bar" style="margin-bottom:14px">
+    <div class="ind-filter-bar" style="margin-bottom:4px">
       <select id="rend-fil-equipo" class="filter-sel" onchange="applyRendFiltro()">
         <option value="">Todos los equipos</option>
         <option value="Personas">Personas</option>
         <option value="Empresas">Empresas</option>
       </select>
-      <select id="rend-fil-area" class="filter-sel" onchange="applyRendFiltro()">
-        <option value="">Todas las áreas</option>
-      </select>
+      <select id="rend-fil-area"   class="filter-sel" onchange="applyRendFiltro()"><option value="">Todas las áreas</option></select>
+      <select id="rend-fil-anio"   class="filter-sel" onchange="applyRendFiltro()"><option value="">Todos los años</option></select>
+      <select id="rend-fil-mes"    class="filter-sel" onchange="applyRendFiltro()"><option value="">Todos los meses</option></select>
+      <select id="rend-fil-sprint" class="filter-sel" onchange="applyRendFiltro()"><option value="">Todos los sprints</option></select>
+      <button class="btn-sec" onclick="clearRendFiltros()" style="font-size:11px;padding:5px 12px">× Limpiar</button>
       <span class="ind-counter" id="rend-counter"></span>
     </div>
+    <div id="rend-filtros-aviso" style="font-size:11px;color:var(--warn);margin-bottom:10px;min-height:16px"></div>
 
     <!-- KPIs -->
-    <div class="kpi-grid" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:14px">
+    <div class="kpi-grid" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:14px">
       <div class="kpi"><div class="kpi-label">Precisión global<span class="info-btn" onmouseenter="showTooltip('rend-precision',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="rend-kpi-prec">—</div><div class="kpi-sub">real / estimado × 100</div></div>
       <div class="kpi"><div class="kpi-label">Desvío global<span class="info-btn" onmouseenter="showTooltip('rend-desvio',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="rend-kpi-desv">—</div><div class="kpi-sub">sobre/sub estimación</div></div>
       <div class="kpi"><div class="kpi-label">Velocidad promedio<span class="info-btn" onmouseenter="showTooltip('rend-velocidad',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="rend-kpi-vel">—</div><div class="kpi-sub">horas por sprint</div></div>
       <div class="kpi"><div class="kpi-label">Total estimado<span class="info-btn" onmouseenter="showTooltip('rend-burnup',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="rend-kpi-plan">—</div><div class="kpi-sub">horas planificadas</div></div>
+      <div class="kpi"><div class="kpi-label">Personas activas<span class="info-btn" onmouseenter="showTooltip('rend-personas',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div><div class="kpi-val" id="rend-kpi-personas">—</div><div class="kpi-sub">colaboradores únicos</div></div>
     </div>
 
     <!-- Fila 1: Precisión + Desvío -->
