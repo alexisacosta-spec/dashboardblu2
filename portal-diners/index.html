@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,500;6..12,600;6..12,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -700,29 +701,58 @@
 <!-- ── VIEW: EQUIPO ── -->
 <div class="view" id="view-equipo">
   <div class="topbar">
-    <div><div class="page-title">Equipo</div><div class="page-sub">Colaboradores del proyecto · El historial es permanente para conservar datos de meses anteriores</div></div>
-    <div style="display:flex;gap:8px">
-      <button class="btn-sec" onclick="openModalCargaEquipo()">↑ Carga masiva</button>
-      <button class="btn-pri" onclick="openModalEquipo()">+ Agregar colaborador</button>
-    </div>
+    <div><div class="page-title">Equipo</div><div class="page-sub">Organización y distribución de recursos por célula</div></div>
   </div>
-  <div class="panel">
-    <div class="panel-hdr">
-      <div class="panel-title">Colaboradores</div>
-      <div class="search-wrap">
-        <input type="text" id="equipo-search" class="search-input"
-          placeholder="Buscar por nombre o correo…"
-          oninput="filterEquipo()">
-        <span class="search-count" id="equipo-count"></span>
+
+  <!-- Inner tabs -->
+  <div class="ind-tabs">
+    <button class="ind-tab" id="equipo-tab-colab" onclick="switchEquipoTab('colab')">Colaboradores</button>
+    <button class="ind-tab active" id="equipo-tab-dist" onclick="switchEquipoTab('dist')">Distribución de células</button>
+  </div>
+
+  <!-- Panel: Colaboradores (visible para todos; acciones de edición solo admin) -->
+  <div id="equipo-panel-colab" style="display:none">
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-title">Colaboradores</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="search-wrap">
+            <input type="text" id="equipo-search" class="search-input"
+              placeholder="Buscar por nombre o correo…"
+              oninput="filterEquipo()">
+            <span class="search-count" id="equipo-count"></span>
+          </div>
+          <div style="display:flex;gap:8px" id="equipo-colab-admin-btns">
+            <button class="btn-sec" onclick="openModalCargaEquipo()">↑ Carga masiva</button>
+            <button class="btn-pri" onclick="openModalEquipo()">+ Agregar colaborador</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel-body" style="overflow-x:auto">
+        <table class="tbl" id="equipo-table">
+          <thead><tr>
+            <th>Nombre</th><th>Correo</th><th>Empresa</th><th>Rol</th><th>Estado</th><th id="th-equipo-acciones">Acciones</th>
+          </tr></thead>
+          <tbody id="equipo-tbody"><tr><td colspan="6"><div class="loader">Cargando…</div></td></tr></tbody>
+        </table>
       </div>
     </div>
-    <div class="panel-body" style="overflow-x:auto">
-      <table class="tbl" id="equipo-table">
-        <thead><tr>
-          <th>Nombre</th><th>Correo</th><th>Empresa</th><th>Rol</th><th>Estado</th><th>Acciones</th>
-        </tr></thead>
-        <tbody id="equipo-tbody"><tr><td colspan="6"><div class="loader">Cargando…</div></td></tr></tbody>
-      </table>
+  </div>
+
+  <!-- Panel: Distribución de células (todos los perfiles) -->
+  <div id="equipo-panel-dist">
+    <div class="panel">
+      <div class="panel-hdr">
+        <div class="panel-title">Distribución de recursos por célula</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="panel-badge" id="celulas-badge"></div>
+          <button class="dl-btn" onclick="showDlMenu(event,[['Imagen PNG','png','downloadCelulasDist()']])" title="Descargar distribución"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><line x1="3" y1="21" x2="21" y2="21"/></svg></button>
+          <button class="btn-sm" id="celulas-edit-btn" onclick="toggleCelulasEdit()" style="display:none">✎ Editar</button>
+          <button class="btn-pri btn-sm" id="celulas-save-btn" onclick="saveCelulas()" style="display:none">Guardar</button>
+          <button class="btn-sec btn-sm" id="celulas-cancel-btn" onclick="cancelCelulasEdit()" style="display:none">Cancelar</button>
+        </div>
+      </div>
+      <div class="panel-body" id="celulas-content"><div class="loader">Cargando…</div></div>
     </div>
   </div>
 </div>

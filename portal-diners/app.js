@@ -459,14 +459,22 @@ async function showDashboard() {
   const isAdmin = USER.perfil === 'admin';
   const verCostos = ['admin','gerente'].includes(USER.perfil);
 
+  // nav-equipo y ambas pestañas visibles para todos los perfiles
+  document.getElementById('nav-equipo').style.display = '';
   if (isAdmin) {
     document.getElementById('sb-admin-sec').style.display = '';
     document.getElementById('nav-usuarios').style.display = '';
-    document.getElementById('nav-equipo').style.display = '';
     document.getElementById('nav-tarifas').style.display = '';
     document.getElementById('nav-cargar').style.display = '';
     document.getElementById('nav-historial').style.display = '';
     document.getElementById('nav-logs').style.display = '';
+    // Admin: botones de gestión en panel colaboradores + botón editar distribución
+    document.getElementById('equipo-colab-admin-btns').style.display = '';
+    document.getElementById('celulas-edit-btn').style.display = '';
+  } else {
+    // No-admin: ocultar botones de escritura y columna acciones
+    document.getElementById('equipo-colab-admin-btns').style.display = 'none';
+    document.getElementById('th-equipo-acciones').style.display = 'none';
   }
   if (!verCostos) {
     document.getElementById('kpi-costo-card').style.display = 'none';
@@ -589,7 +597,7 @@ function renderView(name) {
   const map = {resumen:loadResumen,iniciativas:loadIniciativas,empresas:loadEmpresas,
     personas:loadPersonas,categorias:loadCategorias,avance:loadAvance,
     indicadores:loadIndicadores,
-    usuarios:loadUsuarios,equipo:loadEquipo,tarifas:loadTarifas,
+    usuarios:loadUsuarios,equipo:loadEquipoView,tarifas:loadTarifas,
     cargar:()=>{},historial:loadHistorialCSV,logs:loadLogs};
   if (map[name]) map[name]();
 }
@@ -1716,10 +1724,225 @@ async function uploadCSV(file) {
 // ─── EQUIPO ───────────────────────────────────────────────────────────────────
 const EMPRESAS_CONOCIDAS = ['Sofka','Opinno','Byteq','Digital','Diners','CentroHub'];
 
+// ─── EQUIPO: TABS ─────────────────────────────────────────────────────────────
+function loadEquipoView() { switchEquipoTab('dist'); }
+
+function switchEquipoTab(tab) {
+  ['colab','dist'].forEach(t => {
+    const panel = document.getElementById(`equipo-panel-${t}`);
+    const btn   = document.getElementById(`equipo-tab-${t}`);
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+    if (btn)   btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'colab') loadEquipo();
+  else loadCelulas();
+}
+
+// ─── DISTRIBUCIÓN DE CÉLULAS ──────────────────────────────────────────────────
+const ROL_DEFS = [
+  { id:'scrum',   label:'Scrum',        tipo:'scrum' },
+  { id:'front',   label:'Dev Front',    tipo:'count' },
+  { id:'back',    label:'Dev Back',     tipo:'count' },
+  { id:'qa',      label:'QA',           tipo:'count' },
+  { id:'lt',      label:'LT',           tipo:'count' },
+  { id:'ba',      label:'BA',           tipo:'count' },
+  { id:'arq_fab', label:'Arq. Fábrica', tipo:'count' },
+  { id:'arq_dce', label:'Arq. DCE',     tipo:'count' },
+  { id:'lt_dce',  label:'LT DCE',       tipo:'count' },
+  { id:'devops',  label:'Devops',       tipo:'count' },
+  { id:'pm',      label:'PM',           tipo:'count' },
+];
+
+let _celulasData = null;
+
+async function loadCelulas() {
+  const content = document.getElementById('celulas-content');
+  if (!content) return;
+  content.innerHTML = '<div class="loader">Cargando…</div>';
+  try {
+    const res = await api('/api/celulas');
+    _celulasData = res;
+    const badge = document.getElementById('celulas-badge');
+    if (badge) badge.textContent = res.updated_by ? `Actualizado por ${res.updated_by}` : '';
+    content.innerHTML = renderCelulasDist(res.data);
+    content.addEventListener('input', e => {
+      if (e.target.classList.contains('cg-input') || e.target.classList.contains('cg-checkbox'))
+        updateCelulaTotal(e.target.dataset.celula);
+    });
+  } catch(e) {
+    content.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center">Error al cargar la distribución</div>';
+  }
+}
+
+function renderCelulasDist(data) {
+  const { celulas } = data;
+
+  // ── Tabla de roles ──
+  const thead = `<tr>
+    <th class="cg-rol-col cg-rol-col-hdr">ROL</th>
+    ${celulas.map(c => `<th class="celula-hdr" style="background:${c.color}">${c.nombre}</th>`).join('')}
+  </tr>`;
+
+  let tbodyRows = ROL_DEFS.map(r => `<tr>
+    <td class="cg-rol-col">${r.label}</td>
+    ${celulas.map(c => {
+      const val = c.roles[r.id] ?? 0;
+      if (r.tipo === 'scrum') {
+        return `<td>
+          ${val ? `<span class="cg-scrum" style="background:${c.color}">SCRUM</span>` : `<span class="cg-dash">—</span>`}
+          <input type="checkbox" class="cg-checkbox" data-celula="${c.id}" data-rol="scrum" ${val?'checked':''}>
+        </td>`;
+      }
+      return `<td>
+        ${val ? `<span class="cg-count" style="color:${c.color}">● ${val}</span>` : `<span class="cg-dash">—</span>`}
+        <input type="number" class="cg-input" min="0" max="99" value="${val}" data-celula="${c.id}" data-rol="${r.id}">
+      </td>`;
+    }).join('')}
+  </tr>`).join('');
+
+  const totalRow = `<tr class="cg-total-row">
+    <td class="cg-rol-col">TOTAL</td>
+    ${celulas.map(c => {
+      const t = ROL_DEFS.filter(r => r.tipo === 'count').reduce((s, r) => s + (c.roles[r.id] || 0), 0);
+      return `<td id="cg-total-${c.id}">${t}</td>`;
+    }).join('')}
+  </tr>`;
+
+  const table = `<div class="celulas-wrap"><table class="celulas-grid">
+    <thead>${thead}</thead><tbody>${tbodyRows}${totalRow}</tbody>
+  </table></div>`;
+
+  // ── Funcionalidades ──
+  const featCards = celulas.map(c => {
+    const items = (c.funcionalidades || []).map(f =>
+      `<div class="feat-item">
+        <span class="feat-item-dot">·</span>
+        <span class="feat-item-text">${f}</span>
+        <button class="feat-item-del" onclick="deleteFeat(this)" title="Eliminar">×</button>
+      </div>`
+    ).join('') || `<span style="color:var(--muted);font-size:11px;display:block;padding:2px 0">Sin funcionalidades</span>`;
+    return `<div class="celula-feat-card">
+      <div class="celula-feat-card-hdr" style="background:${c.color}">${c.nombre}</div>
+      <div class="celula-feat-list" id="feat-list-${c.id}">${items}</div>
+      <div class="feat-add-wrap"><button class="feat-add-btn" onclick="addFeat('${c.id}')">+ Agregar</button></div>
+    </div>`;
+  }).join('');
+
+  return `<div class="celulas-container" id="celulas-container">
+    ${table}
+    <div class="celulas-feat-section">
+      <div class="celulas-feat-title">Funcionalidades por célula</div>
+      <div class="celulas-wrap"><div class="celulas-feat-row">${featCards}</div></div>
+    </div>
+  </div>`;
+}
+
+function updateCelulaTotal(celulaId) {
+  const total = ROL_DEFS.filter(r => r.tipo === 'count').reduce((s, r) => {
+    const inp = document.querySelector(`input.cg-input[data-celula="${celulaId}"][data-rol="${r.id}"]`);
+    return s + (parseInt(inp?.value || '0') || 0);
+  }, 0);
+  const el = document.getElementById(`cg-total-${celulaId}`);
+  if (el) el.textContent = total;
+}
+
+function toggleCelulasEdit() {
+  const container = document.getElementById('celulas-container');
+  if (!container) return;
+  container.classList.add('celulas-edit-mode');
+  document.getElementById('celulas-edit-btn').style.display  = 'none';
+  document.getElementById('celulas-save-btn').style.display  = '';
+  document.getElementById('celulas-cancel-btn').style.display = '';
+}
+
+function cancelCelulasEdit() {
+  const content = document.getElementById('celulas-content');
+  if (_celulasData) content.innerHTML = renderCelulasDist(_celulasData.data);
+  const isAdmin = USER.perfil === 'admin';
+  document.getElementById('celulas-edit-btn').style.display  = isAdmin ? '' : 'none';
+  document.getElementById('celulas-save-btn').style.display  = 'none';
+  document.getElementById('celulas-cancel-btn').style.display = 'none';
+}
+
+function addFeat(celulaId) {
+  const txt = prompt('Nombre de la funcionalidad:');
+  if (!txt || !txt.trim()) return;
+  const list = document.getElementById(`feat-list-${celulaId}`);
+  const placeholder = list.querySelector('span');
+  if (placeholder) placeholder.remove();
+  const div = document.createElement('div');
+  div.className = 'feat-item';
+  div.innerHTML = `<span class="feat-item-dot">·</span><span class="feat-item-text">${txt.trim()}</span><button class="feat-item-del" onclick="deleteFeat(this)" title="Eliminar">×</button>`;
+  list.appendChild(div);
+}
+
+function deleteFeat(btn) { btn.closest('.feat-item').remove(); }
+
+async function saveCelulas() {
+  if (!_celulasData) return;
+  const newData = {
+    celulas: _celulasData.data.celulas.map(c => ({
+      ...c,
+      roles: Object.fromEntries(ROL_DEFS.map(r => {
+        if (r.tipo === 'scrum') {
+          const cb = document.querySelector(`input.cg-checkbox[data-celula="${c.id}"][data-rol="scrum"]`);
+          return [r.id, cb?.checked ? 1 : 0];
+        }
+        const inp = document.querySelector(`input.cg-input[data-celula="${c.id}"][data-rol="${r.id}"]`);
+        return [r.id, parseInt(inp?.value || '0') || 0];
+      })),
+      funcionalidades: [...(document.getElementById(`feat-list-${c.id}`)
+        ?.querySelectorAll('.feat-item-text') || [])].map(el => el.textContent.trim()).filter(Boolean)
+    }))
+  };
+  const btn = document.getElementById('celulas-save-btn');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    await api('/api/celulas', 'PUT', { data: newData });
+    _celulasData = { ..._celulasData, data: newData };
+    const badge = document.getElementById('celulas-badge');
+    if (badge) badge.textContent = `Actualizado por ${USER.nombre}`;
+    cancelCelulasEdit();
+    toast('Distribución guardada correctamente');
+  } catch(e) {
+    toast('Error al guardar la distribución', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar';
+  }
+}
+
+async function downloadCelulasDist() {
+  const container = document.getElementById('celulas-container');
+  if (!container) { toast('Carga la distribución primero', 'err'); return; }
+  const btn = _activeDlBtn;
+  // Temporalmente expande los wrappers con scroll para capturar el ancho completo
+  const wraps = [...container.querySelectorAll('.celulas-wrap')];
+  wraps.forEach(w => { w.style.overflow = 'visible'; w.style.minWidth = 'none'; });
+  try {
+    const canvas = await html2canvas(container, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    });
+    const link = document.createElement('a');
+    link.download = 'distribucion-celulas.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    flashBtn(btn);
+    toast('Imagen descargada');
+  } catch(e) {
+    toast('Error al generar la imagen', 'err');
+  } finally {
+    wraps.forEach(w => { w.style.overflow = ''; w.style.minWidth = ''; });
+  }
+}
+
+// ─── EQUIPO: COLABORADORES ────────────────────────────────────────────────────
 let allEquipoRows = [];
 
 async function loadEquipo() {
-  allEquipoRows = await api('/api/admin/equipo');
+  allEquipoRows = await api('/api/equipo');
   renderEquipoTabla(allEquipoRows);
 }
 
@@ -1738,17 +1961,17 @@ function filterEquipo() {
 }
 
 function renderEquipoTabla(rows, preserveSearch = false) {
+  const isAdmin       = USER.perfil === 'admin';
+  const cols          = isAdmin ? 6 : 5;
   const activos       = rows.filter(r => r.estado === 'activo');
   const otroProyecto  = rows.filter(r => r.estado === 'otro_proyecto');
   const desvinculados = rows.filter(r => r.estado === 'desvinculado');
 
-  // Actualizar contador
   const countEl = document.getElementById('equipo-count');
   if (countEl) countEl.textContent = rows.length + ' colaboradores';
 
   function renderFila(r) {
-    let badge, btnEstado;
-
+    let badge, btnEstado = '';
     if (r.estado === 'activo') {
       badge     = '<span class="dot dot-ok"></span> Activo';
       btnEstado = `<button class="btn-sm" style="color:#854F0B;border-color:#BA7517" onclick="cambiarEstadoEquipo(${r.id},'otro_proyecto')">Otro proyecto</button>
@@ -1761,34 +1984,33 @@ function renderEquipoTabla(rows, preserveSearch = false) {
       badge     = '<span class="dot dot-err"></span> Desvinculado';
       btnEstado = `<button class="btn-sm" onclick="cambiarEstadoEquipo(${r.id},'activo')">Reactivar</button>`;
     }
-
     return `<tr>
       <td>${r.nombre}</td>
       <td class="muted" style="font-size:11px">${r.correo}</td>
       <td><span class="badge badge-default">${r.empresa}</span></td>
       <td class="muted" style="font-size:11px">${r.rol}</td>
       <td style="font-size:11px">${badge}</td>
-      <td style="display:flex;gap:5px;flex-wrap:wrap">
+      ${isAdmin ? `<td style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="btn-sm" onclick="editarEquipo(${r.id},'${esc(r.nombre)}','${esc(r.correo)}','${esc(r.empresa)}','${esc(r.rol)}')">Editar</button>
         ${btnEstado}
-      </td>
+      </td>` : ''}
     </tr>`;
   }
 
   let html = '';
   if (activos.length) {
-    html += `<tr><td colspan="6" style="background:var(--surface2);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px">Activos (${activos.length})</td></tr>`;
+    html += `<tr><td colspan="${cols}" style="background:var(--surface2);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 12px">Activos (${activos.length})</td></tr>`;
     html += activos.map(renderFila).join('');
   }
   if (otroProyecto.length) {
-    html += `<tr><td colspan="6" style="background:#FAEEDA;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#854F0B;padding:8px 12px">En otro proyecto (${otroProyecto.length})</td></tr>`;
+    html += `<tr><td colspan="${cols}" style="background:#FAEEDA;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#854F0B;padding:8px 12px">En otro proyecto (${otroProyecto.length})</td></tr>`;
     html += otroProyecto.map(renderFila).join('');
   }
   if (desvinculados.length) {
-    html += `<tr><td colspan="6" style="background:#FFF7ED;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#92400E;padding:8px 12px">Desvinculados (${desvinculados.length})</td></tr>`;
+    html += `<tr><td colspan="${cols}" style="background:#FFF7ED;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#92400E;padding:8px 12px">Desvinculados (${desvinculados.length})</td></tr>`;
     html += desvinculados.map(renderFila).join('');
   }
-  if (!html) html = `<tr><td colspan="6"><div class="no-data">Sin colaboradores<div class="no-data-action">Agrega los miembros del equipo para poder procesar los CSVs de ADO</div></div></td></tr>`;
+  if (!html) html = `<tr><td colspan="${cols}"><div class="no-data">Sin colaboradores<div class="no-data-action">Agrega los miembros del equipo para poder procesar los CSVs de ADO</div></div></td></tr>`;
 
   document.getElementById('equipo-tbody').innerHTML = html;
 }

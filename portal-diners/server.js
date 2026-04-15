@@ -134,6 +134,52 @@ db.run(`CREATE TABLE IF NOT EXISTS tarifas (
   UNIQUE(empresa, rol)
 )`);
 
+// ─── CÉLULAS DISTRIBUCIÓN (persistente — no se borra en migraciones) ─────────
+db.run(`CREATE TABLE IF NOT EXISTS celulas_config (
+  id         INTEGER PRIMARY KEY,
+  data_json  TEXT NOT NULL,
+  updated_at TEXT DEFAULT (datetime('now')),
+  updated_by TEXT
+)`);
+// Sembrar datos iniciales desde el Excel si la tabla está vacía
+const _celulasSeed = { celulas: [
+  { id:'c1', nombre:'CÉLULA 1', color:'#0047AB',
+    roles:{scrum:1,front:2,back:2,qa:2,lt:1,ba:0,arq_fab:0,arq_dce:0,lt_dce:0,devops:0,pm:0},
+    funcionalidades:['Certificación Actualización RN 0.82 + Compatibilidad 16kb Android','SSL Pinning','Calificación de satisfacción','Mejoras pantallas OTP','Mejoras pantallas Código Dactilar','Ajuste de Pantalla Feedzai']
+  },
+  { id:'c2', nombre:'CÉLULA 2', color:'#1565C0',
+    roles:{scrum:0,front:2,back:2,qa:1,lt:1,ba:0,arq_fab:0,arq_dce:0,lt_dce:0,devops:0,pm:0},
+    funcionalidades:['Cambio de clave obligatorio','Migración Aprovisionamiento Google Pay','Fortalecimiento y Cambio de llavez','DeUna código único']
+  },
+  { id:'c3', nombre:'CÉLULA 3', color:'#1976D2',
+    roles:{scrum:1,front:3,back:3,qa:2,lt:1,ba:0,arq_fab:0,arq_dce:0,lt_dce:0,devops:0,pm:0},
+    funcionalidades:['CVV Dinámico','Mejoras pantallas biometría','Integración Blu Benefits']
+  },
+  { id:'c4', nombre:'CÉLULA 4', color:'#1E88E5',
+    roles:{scrum:0,front:2,back:2,qa:2,lt:1,ba:0,arq_fab:0,arq_dce:0,lt_dce:0,devops:0,pm:0},
+    funcionalidades:['Cash Advance','Estado de cuenta de millas / Cashback','Versión del APP en pantallas de perfil']
+  },
+  { id:'c5', nombre:'CÉLULA 5 · Producto', color:'#42A5F5',
+    roles:{scrum:1,front:2,back:2,qa:1,lt:1,ba:0,arq_fab:0,arq_dce:0,lt_dce:0,devops:0,pm:0},
+    funcionalidades:['Taggueos']
+  },
+  { id:'cseg', nombre:'CÉLULA SEGURIDAD', color:'#C0392B',
+    roles:{scrum:0,front:2,back:3,qa:2,lt:1,ba:0,arq_fab:0,arq_dce:0,lt_dce:0,devops:0,pm:0},
+    funcionalidades:['Control de Sesiones','Feedzai','GS']
+  },
+  { id:'ccr', nombre:'CAUSA RAÍZ', color:'#7B1FA2',
+    roles:{scrum:1,front:2,back:2,qa:2,lt:1,ba:0,arq_fab:0,arq_dce:0,lt_dce:0,devops:0,pm:0},
+    funcionalidades:['Incidentes levantados por mesa']
+  },
+  { id:'ctrans', nombre:'TRANSVERSALES', color:'#388E3C',
+    roles:{scrum:0,front:0,back:0,qa:0,lt:0,ba:0,arq_fab:1,arq_dce:1,lt_dce:1,devops:2,pm:1},
+    funcionalidades:[]
+  }
+]};
+if (!db.get('SELECT id FROM celulas_config WHERE id=1')) {
+  db.run('INSERT INTO celulas_config (id,data_json) VALUES (1,?)', [JSON.stringify(_celulasSeed)]);
+}
+
 // Migración de datos: detectar esquema viejo y recrear solo tablas de datos
 const SCHEMA_VERSION = 7;
 db.run("CREATE TABLE IF NOT EXISTS _meta (key TEXT PRIMARY KEY, value TEXT)");
@@ -551,7 +597,12 @@ app.get('/api/admin/logs', authMiddleware, adminOnly, (req, res) => {
   res.json(db.all(`SELECT * FROM sesiones_log ${where} ORDER BY fecha DESC LIMIT ${maxLimit}`, params));
 });
 
-// ─── ADMIN EQUIPO ─────────────────────────────────────────────────────────────
+// ─── EQUIPO (lectura para todos los perfiles autenticados) ───────────────────
+app.get('/api/equipo', authMiddleware, (req, res) => {
+  res.json(db.all('SELECT * FROM equipo ORDER BY estado ASC, empresa ASC, nombre ASC'));
+});
+
+// ─── ADMIN EQUIPO (escritura — solo admin) ────────────────────────────────────
 app.get('/api/admin/equipo', authMiddleware, adminOnly, (req, res) => {
   res.json(db.all('SELECT * FROM equipo ORDER BY estado ASC, empresa ASC, nombre ASC'));
 });
@@ -1569,6 +1620,20 @@ app.post('/api/admin/historial-csv/:id/restaurar', authMiddleware, adminOnly, (r
 
 app.delete('/api/admin/historial-csv/:id', authMiddleware, adminOnly, (req, res) => {
   db.run('DELETE FROM historial_csv WHERE id=?', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// ─── CÉLULAS DISTRIBUCIÓN ─────────────────────────────────────────────────────
+app.get('/api/celulas', authMiddleware, (req, res) => {
+  const row = db.get('SELECT data_json,updated_at,updated_by FROM celulas_config WHERE id=1');
+  if (!row) return res.status(404).json({ error: 'Sin datos' });
+  res.json({ data: JSON.parse(row.data_json), updated_at: row.updated_at, updated_by: row.updated_by });
+});
+app.put('/api/celulas', authMiddleware, adminOnly, (req, res) => {
+  const { data } = req.body;
+  if (!data || !data.celulas) return res.status(400).json({ error: 'data requerido' });
+  db.run("UPDATE celulas_config SET data_json=?,updated_at=datetime('now'),updated_by=? WHERE id=1",
+    [JSON.stringify(data), req.user.nombre]);
   res.json({ ok: true });
 });
 
