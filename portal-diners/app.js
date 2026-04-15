@@ -2315,22 +2315,12 @@ async function loadHistorialCSV() {
           ? '<span class="av-tag av-late" style="font-size:9px;margin-right:4px">Error</span>'
           : esCurrent ? '<span class="av-tag av-prog" style="font-size:9px;margin-right:4px">Actual</span>' : '';
 
-        // Columna Sin Lookup: número clickeable si hay log
-        const sinLookupCell = r.sin_lookup > 0
-          ? `<button onclick="verLogHistorial(${r.id})" style="background:none;border:none;cursor:pointer;font-size:11px;font-weight:600;color:#BA7517;display:flex;align-items:center;gap:4px;padding:0">
-               ${fmtN(r.sin_lookup)}
-               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#BA7517" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-               <span style="font-size:10px;text-decoration:underline">Ver log</span>
-             </button>`
-          : `<span style="font-size:11px;color:var(--muted)">—</span>`;
-
         return `<tr>
           <td style="font-size:12px;font-weight:500">${estadoBadge}${r.nombre_archivo}</td>
           <td class="muted" style="font-size:11px;white-space:nowrap">${new Date(r.fecha_carga).toLocaleString('es-EC')}</td>
           <td class="muted" style="font-size:11px">${r.usuario}</td>
           <td class="num">${fmtN(r.tasks_cargadas)}</td>
           <td class="num">${fmtN(r.iniciativas)}</td>
-          <td>${sinLookupCell}</td>
           <td style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             ${tieneLog || tieneError ? `<button class="btn-sm" onclick="verLogHistorial(${r.id})" style="color:#185FA5">📋 Ver log</button>` : ''}
             ${!esCurrent ? `<button class="btn-pri" style="font-size:11px;padding:4px 10px" onclick="restaurarCSV(${r.id},'${esc(r.nombre_archivo)}','${esc(r.fecha_carga)}')">↩ Restaurar</button>` : ''}
@@ -2338,7 +2328,7 @@ async function loadHistorialCSV() {
           </td>
         </tr>`;
       }).join('') :
-    `<tr><td colspan="7"><div class="no-data">Sin cargas registradas<div class="no-data-action">Las próximas cargas de CSV aparecerán aquí</div></div></td></tr>`;
+    `<tr><td colspan="6"><div class="no-data">Sin cargas registradas<div class="no-data-action">Las próximas cargas de CSV aparecerán aquí</div></div></td></tr>`;
 }
 
 // Ver el log completo de una carga
