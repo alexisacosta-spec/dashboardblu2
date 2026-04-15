@@ -875,6 +875,35 @@
 </div>
 </div>
 
+<!-- MODAL EDITAR PERFIL DE USUARIO -->
+<div class="modal-overlay" id="modal-editar-usuario">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr"><div class="modal-title">Editar perfil de acceso</div></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-user-id">
+      <div class="form-group">
+        <label class="form-label">Usuario</label>
+        <div id="edit-user-nombre" style="font-size:13px;font-weight:600;color:var(--text);padding:6px 0"></div>
+        <div id="edit-user-email"  style="font-size:11px;color:var(--muted)"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Perfil de acceso</label>
+        <select id="edit-user-perfil" class="form-select">
+          <option value="visor">Visor — solo Avance y Equipo</option>
+          <option value="gestor">Gestor — solo horas, sin costos</option>
+          <option value="gerente">Gerente — horas y costos</option>
+          <option value="admin">Administrador — acceso total</option>
+        </select>
+      </div>
+      <div class="error-msg" id="edit-user-err"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn-sec" onclick="closeModal('modal-editar-usuario')">Cancelar</button>
+      <button class="btn-pri" onclick="guardarEditarUsuario()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL NUEVO USUARIO -->
 <div class="modal-overlay" id="modal-usuario">
   <div class="modal">
@@ -885,6 +914,7 @@
       <div class="form-group">
         <label class="form-label">Perfil de acceso</label>
         <select id="u-perfil" class="form-select">
+          <option value="visor">Visor — solo Avance y Equipo</option>
           <option value="gestor">Gestor — solo horas, sin costos</option>
           <option value="gerente">Gerente — horas y costos</option>
           <option value="admin">Administrador — acceso total</option>
@@ -1049,6 +1079,37 @@
     <div id="modal-log-cuerpo"></div>
   </div>
 </div>
+<!-- Modal: Drilldown de tasks por iniciativa -->
+<div class="modal-overlay" id="modal-iniciativa-tasks">
+  <div class="modal" style="max-width:940px;width:96vw">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;gap:12px">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+          <span id="ini-modal-cat" class="av-ini-cat"></span>
+          <span id="ini-modal-tag" class="av-tag"></span>
+        </div>
+        <div class="modal-title" id="ini-modal-nombre">—</div>
+      </div>
+      <button class="btn-sec" style="flex-shrink:0" onclick="document.getElementById('modal-iniciativa-tasks').classList.remove('show')">✕ Cerrar</button>
+    </div>
+    <!-- KPI strip -->
+    <div class="ini-kpi-strip" id="ini-modal-kpis"></div>
+    <!-- Inner tabs -->
+    <div class="ind-tabs" style="margin:14px 0 0">
+      <button class="ind-tab" id="ini-tab-pend" onclick="switchIniTasksTab('pendientes')">Pendientes</button>
+      <button class="ind-tab" id="ini-tab-cerr" onclick="switchIniTasksTab('cerradas')">Cerradas</button>
+    </div>
+    <!-- Table -->
+    <div style="overflow-x:auto;max-height:58vh;overflow-y:auto;margin-top:2px">
+      <table class="tbl" id="ini-tasks-table">
+        <thead id="ini-tasks-thead"></thead>
+        <tbody id="ini-tasks-tbody"><tr><td colspan="7"><div class="loader">Cargando…</div></td></tr></tbody>
+
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- UX-16: Gantt tooltip flotante -->
 <div class="gantt-tip" id="gantt-tip"></div>
 

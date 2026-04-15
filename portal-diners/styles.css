@@ -351,6 +351,7 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 .perfil-admin{background:#FEE2E2;color:#9B1C1C}
 .perfil-gerente{background:#D1FAE5;color:#065F46}
 .perfil-gestor{background:#DBEAFE;color:#1E40AF}
+.perfil-visor{background:#F3F4F6;color:#374151}
 
 /* No data */
 .no-data{text-align:center;padding:2rem;color:var(--light);font-size:13px}
@@ -433,6 +434,30 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 .av-prog{background:#DBEAFE;color:#1E40AF}
 .av-risk{background:#FEF3C7;color:#92400E}
 .av-late{background:#FEE2E2;color:#991B1B}
+
+/* Avance rows — clickable drilldown */
+.avance-row-clickable{cursor:pointer;transition:background .15s,box-shadow .15s}
+.avance-row-clickable:hover{background:#EEF3FF!important;margin:0 -1.25rem;padding-left:1.25rem;padding-right:1.25rem;box-shadow:inset 3px 0 0 var(--blue-el)}
+.av-drill-hint{font-size:14px;color:var(--blue-el);opacity:0;transition:opacity .15s;flex-shrink:0}
+.avance-row-clickable:hover .av-drill-hint{opacity:1}
+
+/* Modal drilldown: KPI strip */
+.ini-kpi-strip{display:flex;align-items:center;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 4px;flex-wrap:wrap}
+.ini-kpi-item{flex:1;min-width:70px;text-align:center;padding:4px 10px}
+.ini-kpi-val{font-size:18px;font-weight:700;color:var(--text);line-height:1.2}
+.ini-kpi-lbl{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.ini-kpi-sep{width:1px;height:36px;background:var(--border);flex-shrink:0;margin:0 4px}
+.ini-kpi-pend .ini-kpi-val{color:#8C2A2A}
+
+/* Estado badges en tabla drilldown */
+.ini-estado-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.ini-estado-active  {background:#FEF3C7;color:#92400E}
+.ini-estado-new     {background:#F1F5F9;color:#475569}
+.ini-estado-closed  {background:#DCFCE7;color:#166534}
+.ini-estado-resolved{background:#EDE9FE;color:#5B21B6}
+.ini-estado-returned{background:#FEE2E2;color:#991B1B}
+.ini-estado-deploy  {background:#DBEAFE;color:#1D4ED8}
+.ini-estado-other   {background:#F1F5F9;color:#475569}
 
 /* Gantt */
 .gantt-outer{overflow-x:auto}

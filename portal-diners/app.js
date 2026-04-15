@@ -453,14 +453,16 @@ async function showDashboard() {
   showScreen('dashboard');
   document.getElementById('sb-nm').textContent = USER.nombre;
   document.getElementById('sb-av').textContent = USER.nombre.split(' ').map(w=>w[0]).slice(0,2).join('');
-  const roles = {admin:'Administrador',gerente:'Gerente · Con costos',gestor:'Gestor'};
+  const roles = {admin:'Administrador',gerente:'Gerente · Con costos',gestor:'Gestor',visor:'Visor'};
   document.getElementById('sb-rl').textContent = roles[USER.perfil] || USER.perfil;
 
   const isAdmin = USER.perfil === 'admin';
+  const isVisor = USER.perfil === 'visor';
   const verCostos = ['admin','gerente'].includes(USER.perfil);
 
-  // nav-equipo y ambas pestañas visibles para todos los perfiles
+  // nav-equipo visible para todos los perfiles
   document.getElementById('nav-equipo').style.display = '';
+
   if (isAdmin) {
     document.getElementById('sb-admin-sec').style.display = '';
     document.getElementById('nav-usuarios').style.display = '';
@@ -476,16 +478,35 @@ async function showDashboard() {
     document.getElementById('equipo-colab-admin-btns').style.display = 'none';
     document.getElementById('th-equipo-acciones').style.display = 'none';
   }
+
   if (!verCostos) {
     document.getElementById('kpi-costo-card').style.display = 'none';
     document.getElementById('th-costo-per').style.display = 'none';
   }
 
+  // ── Perfil VISOR: solo Avance y Equipo ───────────────────────────────────
+  if (isVisor) {
+    // Ocultar todas las secciones de análisis excepto avance
+    document.querySelectorAll('.nav-item').forEach(el => {
+      const oc = el.getAttribute('onclick') || '';
+      const permitido = oc.includes("'avance'") || oc.includes("'equipo'");
+      if (!permitido) el.style.display = 'none';
+    });
+    // Ocultar encabezado "Análisis" de la sidebar
+    const sbSec = document.querySelector('.sb-sec:not(#sb-admin-sec)');
+    if (sbSec) sbSec.style.display = 'none';
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   initTooltipSystem();
-  await loadFiltros();
-  document.getElementById('filter-zone').style.display = '';
-  _updateFilterUI();   // UX-01/12: inicializar badge y botón limpiar
-  showView('resumen');
+  if (!isVisor) {
+    await loadFiltros();
+    document.getElementById('filter-zone').style.display = '';
+    _updateFilterUI();   // UX-01/12: inicializar badge y botón limpiar
+  } else {
+    document.getElementById('filter-zone').style.display = 'none';
+  }
+  showView(isVisor ? 'avance' : 'resumen');
 }
 
 // ─── FILTROS ─────────────────────────────────────────────────────────────────
@@ -1151,8 +1172,20 @@ function renderAvanceTabla(rows) {
       : r.pct >= 85 ? '<span class="av-tag av-prog">En curso</span>'
       : r.pct >= 70 ? '<span class="av-tag av-risk">Atención</span>'
       : '<span class="av-tag av-late">Rezago</span>';
-    return `<div class="avance-row av-g">
-      <div><div class="av-ini-name" title="${r.nombre}">${r.nombre}</div><div class="av-ini-cat">${r.categoria}</div></div>
+    const pendientes   = r.total - r.cerradas;
+    const conDrilldown = USER.perfil !== 'visor';
+    return `<div class="avance-row av-g${conDrilldown ? ' avance-row-clickable' : ''}"
+               ${conDrilldown ? `onclick="openIniTasks('${esc(r.id)}')"` : ''}
+               title="${conDrilldown
+                 ? `Ver ${fmtN(pendientes)} task${pendientes!==1?'s':''} pendiente${pendientes!==1?'s':''} · ${fmtN(r.cerradas)} cerrada${r.cerradas!==1?'s':''}`
+                 : esc(r.nombre)}">
+      <div>
+        <div class="av-ini-name" style="display:flex;align-items:center;gap:5px">
+          <span title="${r.nombre}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.nombre}</span>
+          ${conDrilldown ? '<span class="av-drill-hint">›</span>' : ''}
+        </div>
+        <div class="av-ini-cat">${r.categoria}</div>
+      </div>
       <div class="pbar-track"><div class="pbar-fill" style="width:${r.pct}%;background:${fillColor}"></div></div>
       <div class="av-pct" style="color:${fillColor}">${r.pct}%</div>
       <div class="av-tasks">${fmtN(r.cerradas)} / ${fmtN(r.total)}</div>
@@ -1162,6 +1195,157 @@ function renderAvanceTabla(rows) {
 
   document.getElementById('avance-ini-content').innerHTML = `<div style="padding-top:4px">${hdr}${rowsHtml}</div>`;
 }
+
+// ─── DRILLDOWN DE TASKS POR INICIATIVA ──────────────────────────────────────
+
+let _iniTasksId  = null; // iniciativa actualmente abierta
+let _iniTasksTab = 'pendientes'; // tab activo
+
+function openIniTasks(idIni) {
+  if (USER.perfil === 'visor') return; // visor: sin drilldown
+  // Buscar datos desde el cache ya cargado en memoria (evita pasar JSON en onclick)
+  const r = (_cacheAvance || []).find(x => String(x.id) === String(idIni));
+  if (!r) return;
+  const nombre   = r.nombre;
+  const categoria = r.categoria;
+  _iniTasksId  = idIni;
+  _iniTasksTab = (r.total - r.cerradas) > 0 ? 'pendientes' : 'cerradas';
+
+  // Header
+  document.getElementById('ini-modal-nombre').textContent = nombre;
+  const catEl = document.getElementById('ini-modal-cat');
+  catEl.textContent = categoria;
+  const tagEl = document.getElementById('ini-modal-tag');
+  const pct = r.pct;
+  if (pct >= 100) { tagEl.className='av-tag av-done';  tagEl.textContent='Completa'; }
+  else if (pct >= 85) { tagEl.className='av-tag av-prog'; tagEl.textContent='En curso'; }
+  else if (pct >= 70) { tagEl.className='av-tag av-risk'; tagEl.textContent='Atención'; }
+  else                { tagEl.className='av-tag av-late'; tagEl.textContent='Rezago';  }
+
+  // KPI strip (calculado desde el objeto r — sin fetch extra)
+  const pendientes = r.total - r.cerradas;
+  const otros = r.otros || 0;
+  const fillColor = pct >= 100 ? '#3B5EA6' : pct >= 85 ? '#2D7A4F' : pct >= 70 ? '#8C6A1A' : '#8C2A2A';
+  document.getElementById('ini-modal-kpis').innerHTML = `
+    <div class="ini-kpi-item">
+      <div class="ini-kpi-val" style="color:${fillColor}">${pct}%</div>
+      <div class="ini-kpi-lbl">Avance</div>
+    </div>
+    <div class="ini-kpi-sep"></div>
+    <div class="ini-kpi-item">
+      <div class="ini-kpi-val" style="color:#2D7A4F">${fmtN(r.cerradas)}</div>
+      <div class="ini-kpi-lbl">Cerradas</div>
+    </div>
+    <div class="ini-kpi-item">
+      <div class="ini-kpi-val" style="color:#BA7517">${fmtN(r.activas||0)}</div>
+      <div class="ini-kpi-lbl">Activas</div>
+    </div>
+    <div class="ini-kpi-item">
+      <div class="ini-kpi-val" style="color:#5A6E8A">${fmtN(r.nuevas||0)}</div>
+      <div class="ini-kpi-lbl">Nuevas</div>
+    </div>
+    ${otros > 0 ? `
+    <div class="ini-kpi-item">
+      <div class="ini-kpi-val" style="color:#7C5CBF">${fmtN(otros)}</div>
+      <div class="ini-kpi-lbl">Otros estados</div>
+    </div>` : ''}
+    <div class="ini-kpi-sep"></div>
+    <div class="ini-kpi-item">
+      <div class="ini-kpi-val">${fmtN(r.total)}</div>
+      <div class="ini-kpi-lbl">Total</div>
+    </div>
+    <div class="ini-kpi-item ini-kpi-pend">
+      <div class="ini-kpi-val">${fmtN(pendientes)}</div>
+      <div class="ini-kpi-lbl">Pendientes</div>
+    </div>`;
+
+  // Tabs — actualizar labels con conteos
+  document.getElementById('ini-tab-pend').textContent = `Pendientes (${fmtN(pendientes)})`;
+  document.getElementById('ini-tab-cerr').textContent = `Cerradas (${fmtN(r.cerradas)})`;
+
+  // Activar tab por defecto y cargar
+  switchIniTasksTab(_iniTasksTab);
+
+  document.getElementById('modal-iniciativa-tasks').classList.add('show');
+}
+
+function switchIniTasksTab(tab) {
+  _iniTasksTab = tab;
+  document.getElementById('ini-tab-pend').classList.toggle('active', tab === 'pendientes');
+  document.getElementById('ini-tab-cerr').classList.toggle('active', tab === 'cerradas');
+  loadIniTasks(_iniTasksId, tab);
+}
+
+async function loadIniTasks(idIni, tab) {
+  const tbody = document.getElementById('ini-tasks-tbody');
+  const thead = document.getElementById('ini-tasks-thead');
+  const COLS = 7;
+  tbody.innerHTML = `<tr><td colspan="${COLS}"><div class="loader">Cargando…</div></td></tr>`;
+
+  const esCerradas = tab === 'cerradas';
+  thead.innerHTML = `<tr>
+    <th style="width:80px">ID</th>
+    <th style="width:100px">Sprint</th>
+    <th>Task</th>
+    <th>Asignado a</th>
+    <th class="num" style="width:72px">H. Est.</th>
+    <th class="num" style="width:72px">H. Comp.</th>
+    <th style="width:110px">Estado</th>
+  </tr>`;
+
+  try {
+    const rows = await api(`/api/datos/iniciativa/${encodeURIComponent(idIni)}/tasks-seguimiento?tab=${tab}`);
+
+    if (!rows.length) {
+      const msg  = esCerradas ? 'No hay tasks cerradas aún' : '¡Todas las tasks están cerradas! 🎉';
+      const hint = esCerradas
+        ? 'Las tasks cerradas aparecerán aquí al actualizar el CSV.'
+        : 'Esta iniciativa no tiene tasks pendientes.';
+      tbody.innerHTML = `<tr><td colspan="${COLS}">${emptyState(msg, hint, esCerradas ? '📋' : '🎉')}</td></tr>`;
+      return;
+    }
+
+    const STATE_BADGE = {
+      'Active':          '<span class="ini-estado-badge ini-estado-active">Active</span>',
+      'New':             '<span class="ini-estado-badge ini-estado-new">New</span>',
+      'Closed':          '<span class="ini-estado-badge ini-estado-closed">Closed</span>',
+      'Resolved':        '<span class="ini-estado-badge ini-estado-resolved">Resolved</span>',
+      'Returned':        '<span class="ini-estado-badge ini-estado-returned">Returned</span>',
+      'Ready_to_Deploy': '<span class="ini-estado-badge ini-estado-deploy">Ready to Deploy</span>',
+    };
+
+    const fmtH = h => h > 0 ? `${Math.round(h * 10) / 10}h` : '<span class="muted">—</span>';
+
+    tbody.innerHTML = rows.map(t => {
+      const badge       = STATE_BADGE[t.estado] || `<span class="ini-estado-badge ini-estado-other">${t.estado||'—'}</span>`;
+      const sprintLabel = t.sprint || '<span class="muted" style="font-size:11px">—</span>';
+      const persona     = t.nombre_persona
+        ? `<div style="font-size:12px;font-weight:500">${t.nombre_persona}</div><div style="font-size:10px;color:var(--muted)">${t.empresa && t.empresa !== 'Sin asignar' ? t.empresa : ''}</div>`
+        : '<span class="muted" style="font-size:11px">Sin asignar</span>';
+      const taskIdCell  = t.id_task
+        ? `<span style="font-size:11px;font-weight:600;color:var(--blue-el);font-family:monospace">#${t.id_task}</span>`
+        : '<span class="muted">—</span>';
+      const taskName    = t.nombre_task
+        ? `<div style="font-size:12px;font-weight:500;line-height:1.35">${t.nombre_task}</div>`
+        : '<span class="muted" style="font-size:11px">Sin nombre</span>';
+
+      return `<tr>
+        <td style="white-space:nowrap">${taskIdCell}</td>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap">${sprintLabel}</td>
+        <td>${taskName}</td>
+        <td>${persona}</td>
+        <td class="num" style="font-size:12px;color:var(--muted)">${fmtH(t.horas_estimadas)}</td>
+        <td class="num" style="font-size:12px;font-weight:${t.horas_completadas > 0 ? '600' : '400'};color:${t.horas_completadas > 0 ? 'var(--text)' : 'var(--muted)'}">${fmtH(t.horas_completadas)}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('');
+
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="${COLS}"><div class="no-data">Error al cargar: ${e.message}</div></td></tr>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
   const sorted = [...rows]
@@ -1551,7 +1735,7 @@ async function loadCategorias() {
 // ─── USUARIOS ────────────────────────────────────────────────────────────────
 async function loadUsuarios() {
   const users = await api('/api/admin/usuarios');
-  const PERFILES = {admin:'Administrador',gerente:'Gte. con costos',gestor:'Gestor'};
+  const PERFILES = {admin:'Administrador',gerente:'Gte. con costos',gestor:'Gestor',visor:'Visor'};
   document.getElementById('users-tbody').innerHTML = users.map(u=>`
     <tr>
       <td>${u.nombre}</td>
@@ -1563,6 +1747,7 @@ async function loadUsuarios() {
       }</td>
       <td class="muted" style="font-size:11px">${u.ultimo_acceso?new Date(u.ultimo_acceso).toLocaleString('es-EC'):'Nunca'}</td>
       <td style="display:flex;gap:5px;flex-wrap:wrap">
+        ${u.id !== USER?.id ? `<button class="btn-sm" onclick="editarUsuario(${u.id},'${u.nombre.replace(/'/g,"\\'")}','${u.email}','${u.perfil}')">✎ Perfil</button>` : ''}
         ${u.pendiente
           ? `<button class="btn-sm" onclick="reinvitarUsuario(${u.id},'${u.nombre.replace(/'/g,"\\'")}')">Reinvitar</button>`
           : `<button class="btn-sm" onclick="toggleUser(${u.id},${u.activo})">${u.activo?'Desactivar':'Activar'}</button>`
@@ -1577,6 +1762,32 @@ function openModalNuevoUsuario() {
   document.getElementById('u-perfil').value = 'gestor';
   document.getElementById('u-err').classList.remove('show');
   document.getElementById('modal-usuario').classList.add('show');
+}
+
+function editarUsuario(id, nombre, email, perfilActual) {
+  document.getElementById('edit-user-id').value    = id;
+  document.getElementById('edit-user-nombre').textContent = nombre;
+  document.getElementById('edit-user-email').textContent  = email;
+  document.getElementById('edit-user-perfil').value = perfilActual;
+  const errEl = document.getElementById('edit-user-err');
+  errEl.textContent = ''; errEl.classList.remove('show');
+  document.getElementById('modal-editar-usuario').classList.add('show');
+}
+
+async function guardarEditarUsuario() {
+  const id     = document.getElementById('edit-user-id').value;
+  const perfil = document.getElementById('edit-user-perfil').value;
+  const errEl  = document.getElementById('edit-user-err');
+  errEl.textContent = ''; errEl.classList.remove('show');
+  try {
+    await api(`/api/admin/usuarios/${id}`, 'PATCH', { perfil });
+    closeModal('modal-editar-usuario');
+    toast('Perfil actualizado correctamente', 'ok');
+    loadUsuarios();
+  } catch(e) {
+    errEl.textContent = e.message || 'Error al actualizar el perfil';
+    errEl.classList.add('show');
+  }
 }
 
 async function createUser() {

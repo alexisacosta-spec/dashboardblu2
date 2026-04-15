@@ -190,6 +190,7 @@ if (currentVersion < SCHEMA_VERSION) {
   console.log(`🔄 Migrando BD de v${currentVersion} a v${SCHEMA_VERSION}…`);
   db.run('DROP TABLE IF EXISTS datos_horas');
   db.run('DROP TABLE IF EXISTS tasks_plan');
+  db.run('DROP TABLE IF EXISTS tasks_seguimiento');
   db.run('DROP TABLE IF EXISTS test_cases');
   db.run('DROP TABLE IF EXISTS bugs_csv');
   db.run(`UPDATE _meta SET value='${SCHEMA_VERSION}' WHERE key='schema_version'`);
@@ -215,11 +216,27 @@ db.run(`CREATE TABLE IF NOT EXISTS tasks_plan (
   categoria_negocio TEXT,
   total_tasks INTEGER DEFAULT 0,
   cerradas INTEGER DEFAULT 0,
-  activas INTEGER DEFAULT 0,
-  nuevas INTEGER DEFAULT 0,
+  activas  INTEGER DEFAULT 0,
+  nuevas   INTEGER DEFAULT 0,
+  otros    INTEGER DEFAULT 0,
   fecha_ini TEXT,
   fecha_fin TEXT
 )`);
+db.run(`CREATE TABLE IF NOT EXISTS tasks_seguimiento (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  id_iniciativa   TEXT, nombre_iniciativa TEXT,
+  id_epic         TEXT, nombre_epic       TEXT,
+  id_task         TEXT, nombre_task       TEXT,
+  nombre_persona  TEXT, correo            TEXT,
+  empresa         TEXT, rol               TEXT,
+  estado          TEXT, sprint            TEXT,
+  horas_estimadas   REAL DEFAULT 0,
+  horas_completadas REAL DEFAULT 0,
+  fecha_ini TEXT,       fecha_fin TEXT
+)`);
+db.run(`CREATE INDEX IF NOT EXISTS idx_seg_ini ON tasks_seguimiento(id_iniciativa)`);
+// Migración no destructiva: agregar columna 'otros' a tasks_plan si no existe
+try { db.run('ALTER TABLE tasks_plan ADD COLUMN otros INTEGER DEFAULT 0'); } catch(_) {}
 db.run(`CREATE INDEX IF NOT EXISTS idx_id_ini  ON datos_horas(id_iniciativa)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_id_epic ON datos_horas(id_epic)`);
 db.run(`CREATE INDEX IF NOT EXISTS idx_id_hu   ON datos_horas(id_hu)`);
@@ -488,7 +505,7 @@ app.get('/api/admin/usuarios', authMiddleware, adminOnly, (req, res) => {
 app.post('/api/admin/usuarios', authMiddleware, adminOnly, async (req, res) => {
   const {nombre, email, perfil} = req.body;
   if (!nombre||!email||!perfil) return res.status(400).json({error:'Nombre, email y perfil son requeridos'});
-  if (!['admin','gerente','gestor'].includes(perfil)) return res.status(400).json({error:'Perfil inválido'});
+  if (!['admin','gerente','gestor','visor'].includes(perfil)) return res.status(400).json({error:'Perfil inválido'});
   const emailLower = email.toLowerCase().trim();
   try {
     // Crear usuario inactivo sin contraseña
@@ -1029,22 +1046,44 @@ app.post('/api/admin/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('a
       if (id === 'SIN_INI') continue;
       if (!planMap[id]) {
         planMap[id] = { id, nom: t.nombre_iniciativa, cat: t.categoria_negocio,
-          total:0, cerradas:0, activas:0, nuevas:0, fIni:null, fFin:null };
+          total:0, cerradas:0, activas:0, nuevas:0, otros:0, fIni:null, fFin:null };
       }
       planMap[id].total++;
-      if (t.estado === 'Closed')  planMap[id].cerradas++;
-      if (t.estado === 'Active')  planMap[id].activas++;
-      if (t.estado === 'New')     planMap[id].nuevas++;
+      if      (t.estado === 'Closed') planMap[id].cerradas++;
+      else if (t.estado === 'Active') planMap[id].activas++;
+      else if (t.estado === 'New')    planMap[id].nuevas++;
+      else                            planMap[id].otros++;
       if (t.fecha_ini && (!planMap[id].fIni || t.fecha_ini < planMap[id].fIni)) planMap[id].fIni = t.fecha_ini;
       if (t.fecha_fin && (!planMap[id].fFin || t.fecha_fin > planMap[id].fFin)) planMap[id].fFin = t.fecha_fin;
     }
     db.run('DELETE FROM tasks_plan');
     db.run('BEGIN TRANSACTION');
     Object.values(planMap).forEach(p => {
-      db.run(`INSERT INTO tasks_plan (id_iniciativa,nombre_iniciativa,categoria_negocio,total_tasks,cerradas,activas,nuevas,fecha_ini,fecha_fin) VALUES (?,?,?,?,?,?,?,?,?)`,
-        [p.id, p.nom, p.cat, p.total, p.cerradas, p.activas, p.nuevas, p.fIni, p.fFin]);
+      db.run(`INSERT INTO tasks_plan (id_iniciativa,nombre_iniciativa,categoria_negocio,total_tasks,cerradas,activas,nuevas,otros,fecha_ini,fecha_fin) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        [p.id, p.nom, p.cat, p.total, p.cerradas, p.activas, p.nuevas, p.otros, p.fIni, p.fFin]);
     });
     db.run('COMMIT');
+
+    // ── Poblar tasks_seguimiento (TODAS las tasks — todas los estados) ──
+    db.run('DELETE FROM tasks_seguimiento');
+    db.run('BEGIN TRANSACTION');
+    for (const t of procesadas) {
+      if (!t.id_iniciativa || t.id_iniciativa === 'SIN_INI') continue;
+      db.run(`INSERT INTO tasks_seguimiento
+        (id_iniciativa,nombre_iniciativa,id_epic,nombre_epic,id_task,nombre_task,
+         nombre_persona,correo,empresa,rol,estado,sprint,horas_estimadas,horas_completadas,fecha_ini,fecha_fin)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [t.id_iniciativa, t.nombre_iniciativa,
+         t.id_epic||'', t.nombre_epic||'',
+         t.id_task, t.nombre_task||'',
+         t.nombre_persona||'', t.correo||'',
+         t.empresa||'', t.rol||'',
+         t.estado, t.sprint||'',
+         t.horas_estimadas||0, t.horas_completadas||0,
+         t.fecha_ini||'', t.fecha_fin||'']);
+    }
+    db.run('COMMIT');
+    console.log(`  tasks_seguimiento: ${procesadas.filter(t => t.id_iniciativa && t.id_iniciativa !== 'SIN_INI').length} tasks`);
 
     const checkH = db.get('SELECT COUNT(*) as n FROM datos_horas').n;
     const checkP = db.get('SELECT COUNT(*) as n FROM tasks_plan').n;
@@ -1234,10 +1273,38 @@ app.get('/api/datos/avance-iniciativas', authMiddleware, (req,res) => {
     id: r.id_iniciativa, nombre: r.nombre_iniciativa,
     categoria: r.categoria_negocio || 'Sin Clasificar',
     cerradas: r.cerradas||0, activas: r.activas||0, nuevas: r.nuevas||0,
-    total: r.total_tasks||0,
+    otros: r.otros||0, total: r.total_tasks||0,
     pct: r.total_tasks>0 ? Math.round(r.cerradas/r.total_tasks*1000)/10 : 0,
     fecha_ini: r.fecha_ini, fecha_fin: r.fecha_fin
   })));
+});
+
+// Drilldown de tasks individuales por iniciativa (todas los estados)
+app.get('/api/datos/iniciativa/:idIni/tasks-seguimiento', authMiddleware, (req, res) => {
+  const idIni = String(req.params.idIni).trim();
+  const { tab } = req.query; // 'pendientes' | 'cerradas' | omitir = todas
+  let extra = '';
+  if      (tab === 'cerradas')   extra = ` AND estado = 'Closed'`;
+  else if (tab === 'pendientes') extra = ` AND estado != 'Closed'`;
+  const rows = db.all(`
+    SELECT id_task, nombre_task, id_epic, nombre_epic,
+           nombre_persona, empresa, rol, estado, sprint,
+           horas_estimadas, horas_completadas, fecha_ini, fecha_fin
+    FROM tasks_seguimiento
+    WHERE id_iniciativa = ?${extra}
+    ORDER BY
+      CASE estado
+        WHEN 'Active'          THEN 1
+        WHEN 'Returned'        THEN 2
+        WHEN 'Ready_to_Deploy' THEN 3
+        WHEN 'Resolved'        THEN 4
+        WHEN 'New'             THEN 5
+        WHEN 'Closed'          THEN 6
+        ELSE 7
+      END,
+      sprint, nombre_task
+  `, [idIni]);
+  res.json(rows);
 });
 
 // ─── INDICADORES ─────────────────────────────────────────────────────────────
@@ -1584,6 +1651,7 @@ app.post('/api/admin/historial-csv/:id/restaurar', authMiddleware, adminOnly, (r
 
     db.run('DELETE FROM datos_horas');
     db.run('DELETE FROM tasks_plan');
+    db.run('DELETE FROM tasks_seguimiento'); // no hay snapshot de ésta — se vacía en restore
     db.run('BEGIN TRANSACTION');
     for (const r of horasData) {
       db.run(`INSERT INTO datos_horas
