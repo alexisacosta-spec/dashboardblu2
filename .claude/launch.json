@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mockup-resumen",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "5500", "/Users/AlexisAcosta/Documents/GitHub/dashboardblu2/portal-diners/mockup"],
+      "port": 5500
+    }
+  ]
+}

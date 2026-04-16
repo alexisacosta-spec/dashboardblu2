@@ -315,30 +315,122 @@
   <div class="topbar">
     <div><div class="page-title">Resumen ejecutivo</div><div class="page-sub" id="resumen-sub">Cargando datos…</div></div>
   </div>
-  <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-label">Horas totales</div><div class="kpi-val" id="kpi-h">—</div><div class="kpi-sub">Tasks cerradas</div></div>
-    <div class="kpi" id="kpi-costo-card"><div class="kpi-label">Costo total</div><div class="kpi-val" id="kpi-c">—</div><div class="kpi-sub">USD estimado</div></div>
-    <div class="kpi"><div class="kpi-label">Iniciativas</div><div class="kpi-val" id="kpi-i">—</div><div class="kpi-sub">Con horas registradas</div></div>
-    <div class="kpi"><div class="kpi-label">Personas</div><div class="kpi-val" id="kpi-p">—</div><div class="kpi-sub">Colaboradores activos</div></div>
+
+  <!-- 6 KPIs: 4 existentes + 2 nuevos -->
+  <div class="kpi-grid kpi-grid-6">
+    <div class="kpi">
+      <div class="kpi-label">Horas totales</div>
+      <div class="kpi-val" id="kpi-h">—</div>
+      <div class="kpi-sub">Tasks cerradas</div>
+    </div>
+    <div class="kpi" id="kpi-costo-card">
+      <div class="kpi-label">Costo total</div>
+      <div class="kpi-val" id="kpi-c">—</div>
+      <div class="kpi-sub">USD estimado</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Iniciativas</div>
+      <div class="kpi-val" id="kpi-i">—</div>
+      <div class="kpi-sub">Con horas registradas</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Personas</div>
+      <div class="kpi-val" id="kpi-p">—</div>
+      <div class="kpi-sub">Colaboradores activos</div>
+    </div>
+    <div class="kpi kpi-danger">
+      <div class="kpi-label">Bugs críticos abiertos<span class="info-btn" onmouseenter="showTooltip('bug-criticos',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div>
+      <div class="kpi-val" id="kpi-bugs-crit">—</div>
+      <div class="kpi-sub">Severity 1 · sin cerrar</div>
+    </div>
+    <div class="kpi kpi-warn">
+      <div class="kpi-label">Precisión estimación<span class="info-btn" onmouseenter="showTooltip('rend-precision',this)" onmouseleave="hideTooltip()" onclick="event.stopPropagation()">i</span></div>
+      <div class="kpi-val" id="kpi-precision">—</div>
+      <div class="kpi-sub">Real / Estimado × 100</div>
+    </div>
   </div>
-  <div class="row row-3-1">
+
+  <!-- Composición: estado tasks (wide) + categoría donut -->
+  <div class="row row-resumen-top">
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Horas por mes</div><div style="display:flex;align-items:center;gap:8px"><div class="panel-badge" id="badge-mes-range">—</div><span class="info-btn" onmouseenter="showTooltip('horas-mes',this)" onmouseleave="hideTooltip()">i</span><button class="dl-btn" onclick="showDlMenu(event,[['Imagen PNG','png','downloadChart(\'chart-mes\',\'horas-por-mes\')'],['Excel','xls','exportMesExcel()']])" title="Descargar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><line x1="3" y1="21" x2="21" y2="21"/></svg></button></div></div>
-      <div class="panel-body"><div class="chart-wrap"><canvas id="chart-mes"></canvas></div></div>
+      <div class="panel-hdr">
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="panel-title">Estado de tasks por iniciativa</div>
+          <span class="info-btn" onmouseenter="showTooltip('resumen-estado-tasks',this)" onmouseleave="hideTooltip()">i</span>
+        </div>
+        <div class="panel-badge">tasks planificadas vs. estado actual</div>
+      </div>
+      <div class="panel-body" id="resumen-estado-wrap"><div class="loader">Cargando…</div></div>
     </div>
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Por empresa</div><div style="display:flex;align-items:center;gap:8px"><span class="info-btn" onmouseenter="showTooltip('empresa-donut',this)" onmouseleave="hideTooltip()">i</span><button class="dl-btn" onclick="showDlMenu(event,[['Imagen PNG','png','downloadChart(\'chart-emp-donut\',\'distribucion-empresa\')']])" title="Descargar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><line x1="3" y1="21" x2="21" y2="21"/></svg></button></div></div>
-      <div class="panel-body"><div class="chart-wrap-sm"><canvas id="chart-emp-donut"></canvas></div>
-      <div id="emp-legend" style="margin-top:8px"></div></div>
+      <div class="panel-hdr">
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="panel-title">Por categoría de negocio</div>
+          <span class="info-btn" onmouseenter="showTooltip('resumen-cat',this)" onmouseleave="hideTooltip()">i</span>
+        </div>
+        <div class="panel-badge">horas</div>
+      </div>
+      <div class="panel-body" id="resumen-cat-wrap"><div class="loader">Cargando…</div></div>
     </div>
   </div>
+
+  <!-- Salud: riesgo + bugs + velocidad -->
+  <div class="row row-3">
+    <div class="panel">
+      <div class="panel-hdr">
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="panel-title">⚠ Iniciativas en riesgo</div>
+          <span class="info-btn" onmouseenter="showTooltip('resumen-riesgo',this)" onmouseleave="hideTooltip()">i</span>
+        </div>
+        <div class="panel-badge" id="resumen-riesgo-badge" style="background:#FEF2F2;color:#7F1D1D;border-color:#FECACA">—</div>
+      </div>
+      <div class="panel-body" id="resumen-riesgo-body"><div class="loader">Cargando…</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hdr">
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="panel-title">🐛 Bugs abiertos por iniciativa</div>
+          <span class="info-btn" onmouseenter="showTooltip('resumen-bugs',this)" onmouseleave="hideTooltip()">i</span>
+        </div>
+        <div class="panel-badge">top 5</div>
+      </div>
+      <div class="panel-body" id="resumen-bugs-body"><div class="loader">Cargando…</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-hdr">
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="panel-title">⚡ Velocidad del equipo</div>
+          <span class="info-btn" onmouseenter="showTooltip('resumen-velocidad',this)" onmouseleave="hideTooltip()">i</span>
+        </div>
+        <div class="panel-badge">últimos 6 sprints</div>
+      </div>
+      <div class="panel-body" id="resumen-vel-wrap"><div class="loader">Cargando…</div></div>
+    </div>
+  </div>
+
+  <!-- Detalle de esfuerzo: existentes -->
   <div class="row row-2">
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Top iniciativas</div><div style="display:flex;align-items:center;gap:8px"><div class="panel-badge" onclick="showView('iniciativas')" style="cursor:pointer">Ver todas →</div><span class="info-btn" onmouseenter="showTooltip('top-ini',this)" onmouseleave="hideTooltip()">i</span><button class="dl-btn" onclick="showDlMenu(event,[['Excel','xls','exportTopIniExcel()']])" title="Descargar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><line x1="3" y1="21" x2="21" y2="21"/></svg></button></div></div>
+      <div class="panel-hdr">
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="panel-title">Top iniciativas</div>
+          <span class="info-btn" onmouseenter="showTooltip('top-ini',this)" onmouseleave="hideTooltip()">i</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="panel-badge" onclick="showView('iniciativas')" style="cursor:pointer">Ver todas →</div>
+          <button class="dl-btn" onclick="showDlMenu(event,[['Excel','xls','exportTopIniExcel()']])" title="Descargar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><line x1="3" y1="21" x2="21" y2="21"/></svg></button>
+        </div>
+      </div>
       <div class="panel-body" id="pbar-iniciativas"><div class="loader">Cargando…</div></div>
     </div>
     <div class="panel">
-      <div class="panel-hdr"><div class="panel-title">Horas por rol</div><div style="display:flex;align-items:center;gap:8px"><span class="info-btn" onmouseenter="showTooltip('horas-rol',this)" onmouseleave="hideTooltip()">i</span><button class="dl-btn" onclick="showDlMenu(event,[['Excel','xls','exportRolesExcel()']])" title="Descargar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><line x1="3" y1="21" x2="21" y2="21"/></svg></button></div></div>
+      <div class="panel-hdr">
+        <div style="display:flex;align-items:center;gap:4px">
+          <div class="panel-title">Horas por rol</div>
+          <span class="info-btn" onmouseenter="showTooltip('horas-rol',this)" onmouseleave="hideTooltip()">i</span>
+        </div>
+        <button class="dl-btn" onclick="showDlMenu(event,[['Excel','xls','exportRolesExcel()']])" title="Descargar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5"/><line x1="3" y1="21" x2="21" y2="21"/></svg></button>
+      </div>
       <div class="panel-body" id="pbar-roles"><div class="loader">Cargando…</div></div>
     </div>
   </div>

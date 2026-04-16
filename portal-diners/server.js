@@ -1259,6 +1259,45 @@ app.get('/api/datos/filtros', authMiddleware, (req,res) => {
 app.get('/api/datos/estado', authMiddleware, (req,res) => {
   res.json({ total: (db.get('SELECT COUNT(*) as total FROM datos_horas')||{}).total||0 });
 });
+
+// ─── RESUMEN EJECUTIVO (KPIs extra, bugs y velocidad en una sola llamada) ────
+app.get('/api/datos/resumen-ejecutivo', authMiddleware, (req, res) => {
+  // Bugs críticos abiertos
+  const bugsCriticos   = (db.get(`SELECT COUNT(*) as n FROM bugs_csv WHERE severity='1 - Critical' AND estado != 'Closed'`) || {n:0}).n;
+  const totalAbiertos  = (db.get(`SELECT COUNT(*) as n FROM bugs_csv WHERE estado != 'Closed'`) || {n:0}).n;
+  const totalCerrados  = (db.get(`SELECT COUNT(*) as n FROM bugs_csv WHERE estado = 'Closed'`) || {n:0}).n;
+  const bugsXIni = db.all(`
+    SELECT id_iniciativa, nombre_iniciativa,
+           COUNT(*) as abiertos,
+           SUM(CASE WHEN severity='1 - Critical' THEN 1 ELSE 0 END) as criticos
+    FROM bugs_csv
+    WHERE estado != 'Closed' AND id_iniciativa NOT IN ('SIN_INI','')
+    GROUP BY id_iniciativa
+    ORDER BY abiertos DESC
+    LIMIT 5
+  `);
+  // Precisión global de estimación
+  const precRow = db.get(`SELECT SUM(horas_completadas) as real, SUM(horas_estimadas) as est FROM datos_horas WHERE horas_estimadas > 0`) || {};
+  const precision = (precRow.est||0) > 0 ? Math.round((precRow.real||0) / (precRow.est||1) * 1000) / 10 : null;
+  // Velocidad: últimos 6 sprints
+  const velRows = db.all(`
+    SELECT sprint, ROUND(SUM(horas_completadas),1) AS horas
+    FROM datos_horas WHERE sprint != ''
+    GROUP BY sprint ORDER BY sprint
+  `);
+  const sprintNum = s => { const m = s.match(/(\d+)$/); return m ? parseInt(m[1]) : 0; };
+  velRows.sort((a,b) => sprintNum(a.sprint) - sprintNum(b.sprint));
+  const ultimos6   = velRows.slice(-6);
+  const promVel    = ultimos6.length > 0 ? Math.round(ultimos6.reduce((s,r) => s + (r.horas||0), 0) / ultimos6.length * 10) / 10 : 0;
+  const ultimoH    = ultimos6.length > 0 ? (ultimos6[ultimos6.length-1].horas||0) : 0;
+  const vsProm     = promVel > 0 ? Math.round((ultimoH - promVel) / promVel * 1000) / 10 : null;
+  res.json({
+    bugs:      { criticos: bugsCriticos, abiertos: totalAbiertos, cerrados: totalCerrados, porIniciativa: bugsXIni },
+    precision,
+    velocidad: { sprints: ultimos6, promedio: promVel, ultimo: ultimoH, vsProm }
+  });
+});
+
 app.get('/api/datos/avance-iniciativas', authMiddleware, (req,res) => {
   const { desde, hasta } = req.query;
   let planWhere = `WHERE tp.id_iniciativa NOT IN ('SIN_INI','SIN PARENT','')`;
