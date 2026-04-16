@@ -172,8 +172,10 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 .filter-sel{padding:7px 10px;border:1.5px solid var(--border2);border-radius:var(--r);
   font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--text);
   background:var(--white);cursor:pointer;outline:none;
-  transition:border-color .2s;min-width:115px}
+  transition:border-color .2s;min-width:115px;max-width:200px}
 .filter-sel:focus{border-color:var(--blue-el)}
+#rend-fil-iniciativa{min-width:160px;max-width:220px}
+.filter-sel-active{border-color:var(--blue-el)!important;background:rgba(79,140,255,.06)!important}
 .btn-clear{padding:7px 12px;background:transparent;border:1.5px solid var(--border2);
   border-radius:var(--r);font-family:'Nunito Sans',sans-serif;font-size:11px;
   font-weight:700;color:var(--muted);cursor:pointer;transition:all .2s}
@@ -422,7 +424,7 @@ body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--
 .avance-row{display:grid;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #EBF0FA}
 .avance-row:last-child{border-bottom:none}
 .avance-row:hover{background:#F5F8FF;margin:0 -1.25rem;padding-left:1.25rem;padding-right:1.25rem}
-.av-g{grid-template-columns:220px 1fr 52px 80px 60px}
+.av-g{grid-template-columns:220px 1fr 52px 80px 90px 60px}
 .av-col-h{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .av-col-h.num{text-align:right}
 .av-ini-name{font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

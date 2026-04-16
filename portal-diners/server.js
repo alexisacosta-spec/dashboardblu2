@@ -1261,21 +1261,31 @@ app.get('/api/datos/estado', authMiddleware, (req,res) => {
 });
 app.get('/api/datos/avance-iniciativas', authMiddleware, (req,res) => {
   const { desde, hasta } = req.query;
-  let sql = `SELECT * FROM tasks_plan WHERE id_iniciativa NOT IN ('SIN_INI','SIN PARENT','')`;
+  let planWhere = `WHERE tp.id_iniciativa NOT IN ('SIN_INI','SIN PARENT','')`;
   const params = [];
   if (desde && hasta) {
-    sql += ` AND fecha_ini <= ? AND fecha_fin >= ?`;
+    planWhere += ` AND tp.fecha_ini <= ? AND tp.fecha_fin >= ?`;
     params.push(hasta, desde);
   }
-  sql += ` ORDER BY cerradas DESC`;
-  const rows = db.all(sql, params);
+  const rows = db.all(`
+    SELECT tp.*,
+      ROUND(COALESCE(SUM(dh.horas_completadas), 0), 1) AS horas_completadas,
+      ROUND(COALESCE(SUM(dh.horas_estimadas),   0), 1) AS horas_estimadas
+    FROM tasks_plan tp
+    LEFT JOIN datos_horas dh ON dh.id_iniciativa = tp.id_iniciativa
+    ${planWhere}
+    GROUP BY tp.id_iniciativa
+    ORDER BY tp.cerradas DESC
+  `, params);
   res.json(rows.map(r => ({
     id: r.id_iniciativa, nombre: r.nombre_iniciativa,
     categoria: r.categoria_negocio || 'Sin Clasificar',
     cerradas: r.cerradas||0, activas: r.activas||0, nuevas: r.nuevas||0,
     otros: r.otros||0, total: r.total_tasks||0,
     pct: r.total_tasks>0 ? Math.round(r.cerradas/r.total_tasks*1000)/10 : 0,
-    fecha_ini: r.fecha_ini, fecha_fin: r.fecha_fin
+    fecha_ini: r.fecha_ini, fecha_fin: r.fecha_fin,
+    horas: r.horas_completadas||0,
+    horas_est: r.horas_estimadas||0
   })));
 });
 
@@ -1510,11 +1520,12 @@ app.get('/api/indicadores/bugs/detalle', authMiddleware, (req, res) => {
 // ─── RENDIMIENTO DEL EQUIPO ───────────────────────────────────────────────────
 function buildRendWhere(q) {
   const c = [], p = [];
-  if (q.equipo) { c.push("area_path LIKE ?");  p.push(`Gestion Blu\\${q.equipo}%`); }
-  if (q.area)   { c.push("area_path = ?");      p.push(q.area); }
-  if (q.anio)   { c.push("anio = ?");           p.push(parseInt(q.anio)); }
-  if (q.mes)    { c.push("mes = ?");            p.push(parseInt(q.mes)); }
-  if (q.sprint) { c.push("sprint = ?");         p.push(q.sprint); }
+  if (q.iniciativa) { c.push('id_iniciativa = ?');    p.push(String(q.iniciativa)); }
+  if (q.equipo)     { c.push("area_path LIKE ?");      p.push(`Gestion Blu\\${q.equipo}%`); }
+  if (q.area)       { c.push("area_path = ?");         p.push(q.area); }
+  if (q.anio)       { c.push("anio = ?");              p.push(parseInt(q.anio)); }
+  if (q.mes)        { c.push("mes = ?");               p.push(parseInt(q.mes)); }
+  if (q.sprint)     { c.push("sprint = ?");            p.push(q.sprint); }
   return { where: c.length ? 'WHERE ' + c.join(' AND ') : '', params: p };
 }
 
@@ -1524,7 +1535,13 @@ app.get('/api/indicadores/rendimiento/filtros', authMiddleware, (req, res) => {
   const sprints = db.all(`SELECT DISTINCT sprint FROM datos_horas WHERE sprint != '' ORDER BY sprint`).map(r => r.sprint);
   const areas   = db.all(`SELECT DISTINCT area_path FROM datos_horas WHERE area_path != '' ORDER BY area_path`)
                     .map(r => ({ area_path: r.area_path, label: areaLabel(r.area_path) }));
-  res.json({ anios, meses, sprints, areas });
+  const iniciativas = db.all(`
+    SELECT id_iniciativa AS id, nombre_iniciativa AS nombre
+    FROM tasks_plan
+    WHERE id_iniciativa NOT IN ('SIN_INI','SIN PARENT','')
+    ORDER BY nombre_iniciativa
+  `);
+  res.json({ anios, meses, sprints, areas, iniciativas });
 });
 
 // Helper: extraer etiqueta legible del area_path (último segmento)

@@ -128,6 +128,7 @@ function showGanttTip(e, el) {
     <div class="gantt-tip-row">📅 <b>${el.dataset.ini||'?'}</b> → <b>${el.dataset.fin||'?'}</b></div>
     <div class="gantt-tip-row">⏱ Lead Time: <b>${el.dataset.lt||'?'}d</b></div>
     <div class="gantt-tip-row">✅ Avance: <b>${el.dataset.pct||'0'}%</b> (${el.dataset.cerradas||0}/${el.dataset.total||0} tasks)</div>
+    ${Number(el.dataset.horas) > 0 ? `<div class="gantt-tip-row">🕐 Horas: <b>${Math.round(Number(el.dataset.horas)).toLocaleString('es-EC')}h comp</b>${Number(el.dataset.horasEst) > 0 ? ` / ${Math.round(Number(el.dataset.horasEst)).toLocaleString('es-EC')}h est` : ''}</div>` : ''}
     <div class="gantt-tip-row" style="margin-top:4px"><span style="background:${el.dataset.color||'#ccc'}30;color:${el.dataset.color||'#666'};border:1px solid ${el.dataset.color||'#ccc'}55;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700">${el.dataset.estado||'—'}</span></div>`;
   t.style.display = '';
   _posGanttTip(e);
@@ -1162,6 +1163,7 @@ function renderAvanceTabla(rows) {
     <span class="av-col-h">Progreso</span>
     <span class="av-col-h num">%</span>
     <span class="av-col-h num">Tasks</span>
+    <span class="av-col-h num">Horas</span>
     <span class="av-col-h num">Estado</span>
   </div>`;
 
@@ -1189,6 +1191,9 @@ function renderAvanceTabla(rows) {
       <div class="pbar-track"><div class="pbar-fill" style="width:${r.pct}%;background:${fillColor}"></div></div>
       <div class="av-pct" style="color:${fillColor}">${r.pct}%</div>
       <div class="av-tasks">${fmtN(r.cerradas)} / ${fmtN(r.total)}</div>
+      <div class="av-horas">${r.horas > 0
+        ? `<span style="font-size:11px;font-weight:600;color:${r.horas > r.horas_est && r.horas_est > 0 ? '#BA7517' : 'var(--text)'}">${fmtN(Math.round(r.horas))}h</span>${r.horas_est > 0 ? `<span style="font-size:9px;color:var(--muted);display:block">/ ${fmtN(Math.round(r.horas_est))}h est</span>` : ''}`
+        : '<span style="font-size:11px;color:var(--muted)">—</span>'}</div>
       <div>${tag}</div>
     </div>`;
   }).join('');
@@ -1468,12 +1473,13 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
           data-ini="${dIni}" data-fin="${dFin}"
           data-lt="${ltDays}" data-pct="${r.pct}"
           data-cerradas="${r.cerradas||0}" data-total="${r.total||0}"
+          data-horas="${r.horas||0}" data-horas-est="${r.horas_est||0}"
           data-estado="${cls.estado}" data-color="${cls.color}"
           onmouseenter="showGanttTip(event,this)"
           onmousemove="_posGanttTip(event)"
           onmouseleave="hideGanttTip()"
           style="left:${left.toFixed(1)}%;width:${Math.max(width,1).toFixed(1)}%;background:${cls.color};opacity:0.88">
-          <span class="gantt-bar-lbl">${dIni} — ${dFin} · ${r.pct}%</span>
+          <span class="gantt-bar-lbl">${dIni} — ${dFin} · ${r.pct}%${r.horas > 0 ? ` · ${fmtN(Math.round(r.horas))}h` : ''}</span>
         </div>
       </div>
     </div>`;
@@ -2818,7 +2824,7 @@ function exportMesExcel()    { exportDataExcel(_cacheResumen.mes.map(r=>({'Mes':
 function exportRolesExcel()  { exportDataExcel(_cacheResumen.roles.map(r=>({'Rol':r.label,'Horas':r.horas})), 'Por rol', 'horas-por-rol'); }
 function exportTopIniExcel() { exportDataExcel(_cacheResumen.topIni.map(r=>({'Iniciativa':r.label,'Horas':r.horas})), 'Top iniciativas', 'top-iniciativas'); }
 function exportCatExcel()    { exportDataExcel(_cacheCategorias.map(r=>({'Categoría':r.categoria_negocio,'Horas':r.horas,'Costo':r.costo})), 'Categorías', 'horas-por-categoria'); }
-function exportAvanceExcel() { exportDataExcel(_cacheAvance.map(r=>({'Iniciativa':r.nombre,'Categoría':r.categoria,'Tasks cerradas':r.cerradas,'Tasks activas':r.activas,'Tasks nuevas':r.nuevas,'Total tasks':r.total,'% Avance':r.pct,'Fecha inicio':r.fecha_ini,'Fecha fin':r.fecha_fin})), 'Avance', 'avance-iniciativas'); }
+function exportAvanceExcel() { exportDataExcel(_cacheAvance.map(r=>({'Iniciativa':r.nombre,'Categoría':r.categoria,'Tasks cerradas':r.cerradas,'Tasks activas':r.activas,'Tasks nuevas':r.nuevas,'Total tasks':r.total,'% Avance':r.pct,'H. Completadas':r.horas,'H. Estimadas':r.horas_est,'Fecha inicio':r.fecha_ini,'Fecha fin':r.fecha_fin})), 'Avance', 'avance-iniciativas'); }
 function exportPersonasExcel(){ exportTableExcel('personas-content', 'equipo-horas'); }
 function exportEmpresaExcel(){ exportTableExcel('emp-table-wrap', 'horas-por-empresa'); }
 function exportHeatmapExcel(){ exportTableExcel('heatmap-content', 'matriz-empresa-rol'); }
@@ -3505,11 +3511,12 @@ async function loadRendimiento() {
 
 function buildRendParams() {
   const vals = {
-    equipo: document.getElementById('rend-fil-equipo')?.value || '',
-    area:   document.getElementById('rend-fil-area')?.value   || '',
-    anio:   document.getElementById('rend-fil-anio')?.value   || '',
-    mes:    document.getElementById('rend-fil-mes')?.value    || '',
-    sprint: document.getElementById('rend-fil-sprint')?.value || ''
+    iniciativa: document.getElementById('rend-fil-iniciativa')?.value || '',
+    equipo:     document.getElementById('rend-fil-equipo')?.value     || '',
+    area:       document.getElementById('rend-fil-area')?.value       || '',
+    anio:       document.getElementById('rend-fil-anio')?.value       || '',
+    mes:        document.getElementById('rend-fil-mes')?.value        || '',
+    sprint:     document.getElementById('rend-fil-sprint')?.value     || ''
   };
   const p = Object.entries(vals).filter(([,v]) => v).map(([k,v]) => `${k}=${encodeURIComponent(v)}`);
   return p.length ? '?' + p.join('&') : '';
@@ -3529,24 +3536,32 @@ async function loadRendFiltros() {
 
   try {
     const d = await api('/api/indicadores/rendimiento/filtros');
-    repoblar('rend-fil-area',   d.areas.map(a   => `<option value="${a.area_path}">${a.label}</option>`).join(''), 'Todas las áreas');
-    repoblar('rend-fil-anio',   d.anios.map(a   => `<option value="${a}">${a}</option>`).join(''),                 'Todos los años');
-    repoblar('rend-fil-mes',    d.meses.map(m   => `<option value="${m}">${MES_NOMBRE[m] || m}</option>`).join(''), 'Todos los meses');
-    repoblar('rend-fil-sprint', d.sprints.map(s => `<option value="${s}">${s}</option>`).join(''),                 'Todos los sprints');
+    repoblar('rend-fil-iniciativa', (d.iniciativas||[]).map(i => `<option value="${i.id}">${i.nombre}</option>`).join(''), 'Todas las iniciativas');
+    repoblar('rend-fil-area',       d.areas.map(a   => `<option value="${a.area_path}">${a.label}</option>`).join(''),     'Todas las áreas');
+    repoblar('rend-fil-anio',       d.anios.map(a   => `<option value="${a}">${a}</option>`).join(''),                     'Todos los años');
+    repoblar('rend-fil-mes',        d.meses.map(m   => `<option value="${m}">${MES_NOMBRE[m] || m}</option>`).join(''),    'Todos los meses');
+    repoblar('rend-fil-sprint',     d.sprints.map(s => `<option value="${s}">${s}</option>`).join(''),                     'Todos los sprints');
+    // Restaurar clase visual si hay iniciativa activa tras repoblar
+    const iniSel = document.getElementById('rend-fil-iniciativa');
+    if (iniSel) iniSel.classList.toggle('filter-sel-active', !!iniSel.value);
+    _updateRendAviso();
   } catch(e) {
     console.warn('loadRendFiltros error:', e.message);
   }
 }
 
 function applyRendFiltro() {
+  // Resaltar visualmente el select de iniciativa cuando tiene valor
+  const iniSel = document.getElementById('rend-fil-iniciativa');
+  if (iniSel) iniSel.classList.toggle('filter-sel-active', !!iniSel.value);
   _updateRendAviso();
   loadRendimiento();
 }
 
 function clearRendFiltros() {
-  ['rend-fil-equipo','rend-fil-area','rend-fil-anio','rend-fil-mes','rend-fil-sprint'].forEach(id => {
+  ['rend-fil-iniciativa','rend-fil-equipo','rend-fil-area','rend-fil-anio','rend-fil-mes','rend-fil-sprint'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.value = '';
+    if (el) { el.value = ''; el.classList.remove('filter-sel-active'); }
   });
   _updateRendAviso();
   loadRendimiento();
@@ -3558,9 +3573,13 @@ function _updateRendAviso() {
   const anio   = document.getElementById('rend-fil-anio')?.value   || '';
   const mes    = document.getElementById('rend-fil-mes')?.value    || '';
   const sprint = document.getElementById('rend-fil-sprint')?.value || '';
+  const iniSel = document.getElementById('rend-fil-iniciativa');
+  const iniVal = iniSel?.value || '';
+  const iniTxt = iniVal && iniSel.selectedIndex >= 0 ? (iniSel.options[iniSel.selectedIndex]?.text || iniVal) : '';
   const MES_NOMBRE = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
   const avisos = [];
+  if (iniTxt)          avisos.push(`📌 Iniciativa: ${iniTxt}`);
   if (mes && !anio)    avisos.push(`Mostrando ${MES_NOMBRE[parseInt(mes)] || 'mes ' + mes} de todos los años disponibles`);
   if (sprint && anio)  avisos.push(`Filtro sprint + año activos — los datos de velocidad muestran solo este sprint`);
   aviso.textContent = avisos.join(' · ');
