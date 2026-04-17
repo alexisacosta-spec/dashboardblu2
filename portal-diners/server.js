@@ -32,6 +32,10 @@ const celulasRoutes     = require('./routes/celulas');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// Necesario cuando el servidor corre detrás de un reverse proxy (Railway, Render, Fly, etc.)
+// Permite que express-rate-limit lea X-Forwarded-For para identificar la IP real del cliente
+app.set('trust proxy', 1);
+
 app.use(helmetConfig);
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
