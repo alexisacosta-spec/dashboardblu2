@@ -1,0 +1,31 @@
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* ── Paleta DCE real (extraída del sitio oficial) ── */
+  --bg-dark:    #0D1B2E;   /* fondo oscuro principal */
+  --bg-dark2:   #0A1520;   /* fondo más oscuro */
+  --bg-dark3:   #111F35;   /* capas intermedias */
+  --blue-el:    #2B5FE8;   /* azul eléctrico botones/acentos */
+  --blue-el2:   #1A4DD0;   /* hover azul eléctrico */
+  --blue-el3:   #4A78F0;   /* azul claro hover states */
+  --blue-glow:  rgba(43,95,232,0.18); /* glow sutil */
+  /* superficies dashboard (modo claro) */
+  --surface:    #F2F5FA;
+  --surface2:   #E8EDF6;
+  --surface3:   #FFFFFF;
+  --text:       #0D1B2E;
+  --text2:      #2C3E5A;
+  --muted:      #5A6E8A;
+  --light:      #8FA3BE;
+  --border:     #D0DCF0;
+  --border2:    #BDD0EA;
+  /* semánticos */
+  --error:      #D92B2B;
+  --success:    #0F7A3C;
+  --warn:       #B86A00;
+  --white:      #FFFFFF;
+  --shadow:     0 4px 20px rgba(13,27,46,.1);
+  --shadow-lg:  0 20px 60px rgba(13,27,46,.22);
+  --r:          8px;
+  --r-lg:       12px;
+}
+body{font-family:'Nunito Sans',sans-serif;background:var(--bg-dark);color:var(--text);min-height:100vh;overflow-x:hidden}

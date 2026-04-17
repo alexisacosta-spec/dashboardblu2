@@ -1,0 +1,171 @@
+/* ── AVANCE / DELIVERY / QA ── */
+.avance-hdr-row{display:grid;gap:8px;align-items:center;padding:0 0 7px;border-bottom:1.5px solid var(--border)}
+.avance-row{display:grid;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #EBF0FA}
+.avance-row:last-child{border-bottom:none}
+.avance-row:hover{background:#F5F8FF;margin:0 -1.25rem;padding-left:1.25rem;padding-right:1.25rem}
+.av-g{grid-template-columns:220px 1fr 52px 80px 90px 60px}
+.av-col-h{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.av-col-h.num{text-align:right}
+.av-ini-name{font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.av-ini-cat{font-size:10px;color:var(--light);margin-top:1px}
+.av-pct{font-size:12px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.av-tasks{font-size:10px;color:var(--muted);text-align:right;white-space:nowrap}
+.av-tag{display:inline-block;font-size:9px;padding:2px 8px;border-radius:20px;font-weight:700;text-align:center;white-space:nowrap}
+.av-done{background:#EAF3DE;color:#3B6D11}
+.av-prog{background:#DBEAFE;color:#1E40AF}
+.av-risk{background:#FEF3C7;color:#92400E}
+.av-late{background:#FEE2E2;color:#991B1B}
+
+/* Avance rows — clickable drilldown */
+.avance-row-clickable{cursor:pointer;transition:background .15s,box-shadow .15s}
+.avance-row-clickable:hover{background:#EEF3FF!important;margin:0 -1.25rem;padding-left:1.25rem;padding-right:1.25rem;box-shadow:inset 3px 0 0 var(--blue-el)}
+.av-drill-hint{font-size:14px;color:var(--blue-el);opacity:0;transition:opacity .15s;flex-shrink:0}
+.avance-row-clickable:hover .av-drill-hint{opacity:1}
+
+/* Modal drilldown: KPI strip */
+.ini-kpi-strip{display:flex;align-items:center;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:10px 4px;flex-wrap:wrap}
+.ini-kpi-item{flex:1;min-width:70px;text-align:center;padding:4px 10px}
+.ini-kpi-val{font-size:18px;font-weight:700;color:var(--text);line-height:1.2}
+.ini-kpi-lbl{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.ini-kpi-sep{width:1px;height:36px;background:var(--border);flex-shrink:0;margin:0 4px}
+.ini-kpi-pend .ini-kpi-val{color:#8C2A2A}
+
+/* Estado badges en tabla drilldown */
+.ini-estado-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.ini-estado-active  {background:#FEF3C7;color:#92400E}
+.ini-estado-new     {background:#F1F5F9;color:#475569}
+.ini-estado-closed  {background:#DCFCE7;color:#166534}
+.ini-estado-resolved{background:#EDE9FE;color:#5B21B6}
+.ini-estado-returned{background:#FEE2E2;color:#991B1B}
+.ini-estado-deploy  {background:#DBEAFE;color:#1D4ED8}
+.ini-estado-other   {background:#F1F5F9;color:#475569}
+
+/* Gantt */
+.gantt-outer{overflow-x:auto}
+.gantt-inner{min-width:640px}
+.gantt-hdr-row{display:flex;margin-bottom:4px}
+.gantt-label{width:220px;flex-shrink:0}
+.gantt-months{flex:1;display:flex}
+.gantt-month{flex:1;text-align:center;font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.07em;text-transform:uppercase;padding-bottom:5px;border-bottom:0.5px solid var(--border)}
+.gantt-row{display:flex;align-items:center;padding:5px 0;border-bottom:0.5px solid #EBF0FA}
+.gantt-row:last-child{border-bottom:none}
+.gantt-name{width:220px;flex-shrink:0;padding-right:12px}
+.gantt-name-text{font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gantt-name-sub{font-size:9px;color:var(--light)}
+.gantt-track{flex:1;position:relative;height:24px}
+.gantt-vline{position:absolute;top:0;bottom:0;width:0.5px;background:var(--border)}
+.gantt-bar{position:absolute;height:16px;top:4px;border-radius:4px;display:flex;align-items:center;padding:0 6px;overflow:hidden;transition:opacity .2s}
+.gantt-bar:hover{opacity:.85}
+.gantt-bar-lbl{font-size:9px;font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-today{position:absolute;top:0;bottom:0;width:2px;background:#D92B2B;z-index:2;border-radius:1px}
+.gantt-today-lbl{position:absolute;top:-15px;font-size:8px;font-weight:700;color:#D92B2B;transform:translateX(-50%);white-space:nowrap}
+.gb-done{background:#1D9E75}
+.gb-prog{background:var(--blue-el)}
+.gb-risk{background:#BA7517}
+
+/* QA estados summary */
+.qa-estados-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.qa-estado-card{background:var(--surface2);border:0.5px solid var(--border);border-radius:var(--r-lg);padding:12px;text-align:center;position:relative;overflow:hidden}
+.qa-estado-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.qe-design::before{background:#8FA3BE}
+.qe-ready::before{background:#534AB7}
+.qe-active::before{background:var(--blue-el)}
+.qe-passed::before{background:#1D9E75}
+.qe-failed::before{background:#D92B2B}
+.qe-blocked::before{background:#BA7517}
+.qa-estado-val{font-family:'Nunito',sans-serif;font-size:22px;font-weight:700;color:var(--text);line-height:1.2}
+.qa-estado-val.design{color:#8FA3BE}
+.qa-estado-val.ready{color:#534AB7}
+.qa-estado-val.active{color:var(--blue-el)}
+.qa-estado-val.passed{color:#1D9E75}
+.qa-estado-val.failed{color:#D92B2B}
+.qa-estado-val.blocked{color:#BA7517}
+.qa-estado-val.empty{color:var(--light)}
+.qa-estado-name{font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-top:3px}
+.qa-estado-desc{font-size:9px;color:var(--light);margin-top:1px}
+
+/* QA tabla */
+.qa-tbl-hdr{display:grid;gap:6px;padding:0 0 7px;border-bottom:1.5px solid var(--border)}
+.qa-tbl-row{display:grid;gap:6px;padding:9px 0;border-bottom:1px solid #EBF0FA;align-items:center}
+.qa-tbl-row:last-child{border-bottom:none}
+.qa-tbl-row:hover{background:#F5F8FF;margin:0 -1.25rem;padding-left:1.25rem;padding-right:1.25rem}
+.qa-g{grid-template-columns:1fr 52px 56px 52px 52px 52px 52px}
+.qa-col-h{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:center}
+.qa-col-h:first-child{text-align:left}
+.qa-cell{font-size:11px;font-weight:600;text-align:center;font-variant-numeric:tabular-nums}
+.qa-cell.design{color:#8FA3BE}
+.qa-cell.ready{color:#534AB7}
+.qa-cell.active{color:var(--blue-el)}
+.qa-cell.passed{color:#1D9E75}
+.qa-cell.failed{color:#D92B2B}
+.qa-cell.blocked{color:#BA7517}
+.qa-cell.total{color:var(--text)}
+.qa-cell.empty{color:var(--light)}
+.qa-ini-name{font-size:11px;font-weight:600;color:var(--text)}
+.qa-ini-sub{font-size:9px;color:var(--light);margin-top:1px}
+
+/* QA barra apilada */
+.qa-stack-wrap{margin-top:14px}
+.qa-stack-label{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:5px}
+.qa-stack-bar{height:12px;background:var(--surface2);border-radius:6px;overflow:hidden;display:flex}
+.qa-stack-seg{height:100%;transition:width .4s}
+.qa-stack-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.qa-leg-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--muted)}
+.qa-leg-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* Nota informativa */
+.info-note{background:#EFF6FF;border:0.5px solid var(--border2);border-left:3px solid var(--blue-el);border-radius:var(--r);padding:10px 14px;font-size:11px;color:var(--text2);line-height:1.7;margin-top:14px}
+.info-note strong{color:var(--bg-dark)}
+
+/* ── AVANCE FILTER BAR ── */
+.avance-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);
+  padding:8px 14px}
+.avance-filter-label{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);white-space:nowrap}
+.avance-filter-inputs{display:flex;align-items:center;gap:8px}
+.avance-date-group{display:flex;flex-direction:column;gap:2px}
+.avance-date-lbl{font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.avance-date-input{padding:5px 9px;border:1.5px solid var(--border2);border-radius:var(--r);
+  font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--text);
+  background:var(--surface);outline:none;transition:border-color .15s;cursor:pointer}
+.avance-date-input:focus{border-color:var(--blue-el)}
+.avance-filter-sep{font-size:13px;color:var(--muted);margin-top:10px}
+.avance-filter-btn{padding:6px 14px;border-radius:var(--r);font-family:'Nunito Sans',sans-serif;
+  font-size:11px;font-weight:700;cursor:pointer;border:none;
+  background:var(--blue-el);color:#fff;transition:opacity .15s}
+.avance-filter-btn:hover{opacity:.85}
+.avance-filter-btn-clear{background:transparent;color:var(--muted);
+  border:1.5px solid var(--border2)}
+.avance-filter-btn-clear:hover{border-color:var(--muted);opacity:1}
+
+/* ── GANTT DOS NIVELES (meses + semanas) ── */
+.gantt-hdr-months{display:flex;flex:1;border-bottom:1.5px solid var(--border)}
+.gantt-hdr-month-block{position:relative;display:flex;flex-direction:column;
+  border-right:1px solid var(--border2);padding-bottom:4px}
+.gantt-hdr-month-block:last-child{border-right:none}
+.gantt-month-lbl{font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--text2);padding:3px 6px 2px;white-space:nowrap}
+.gantt-hdr-weeks{display:flex;flex:1;border-top:0.5px solid var(--border2)}
+.gantt-week-lbl{flex:1;text-align:center;font-size:8px;color:var(--muted);padding:2px 0;
+  border-right:0.5px solid var(--border2);white-space:nowrap;overflow:hidden}
+.gantt-week-lbl:last-child{border-right:none}
+.gantt-day-lbl{flex:1;text-align:center;font-size:7px;color:var(--muted);padding:2px 0;
+  border-right:0.5px solid var(--border);white-space:nowrap;overflow:hidden;min-width:0}
+.gantt-day-lbl:last-child{border-right:none}
+.gantt-vline-week{position:absolute;top:0;bottom:0;width:0.5px;background:var(--border)}
+.gantt-vline-month{position:absolute;top:0;bottom:0;width:1px;background:var(--border2)}
+
+/* ── INDICADORES ── */
+.ind-filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ind-search-input{padding:7px 12px;border:1.5px solid var(--border2);border-radius:var(--r);
+  font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--text);
+  background:var(--white);outline:none;transition:border-color .15s;min-width:220px}
+.ind-search-input:focus{border-color:var(--blue-el)}
+.ind-counter{font-size:10px;font-weight:700;color:var(--muted);
+  background:var(--surface2);border:1px solid var(--border2);
+  padding:4px 10px;border-radius:20px;white-space:nowrap}
+
+/* Tabla Lead Time */
+.lt-pbar-track{height:5px;background:var(--border);border-radius:3px;min-width:50px;flex:1}
+.lt-pbar-fill{height:5px;border-radius:3px;transition:width .3s}

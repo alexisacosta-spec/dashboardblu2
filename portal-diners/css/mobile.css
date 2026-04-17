@@ -1,0 +1,52 @@
+/* ── UX-17: Botón hamburguesa (solo mobile) ── */
+.btn-hamburger{display:none;position:fixed;top:12px;left:12px;z-index:400;
+  width:40px;height:40px;border-radius:var(--r);border:none;cursor:pointer;
+  background:var(--bg-dark);box-shadow:0 2px 10px rgba(0,0,0,.35);
+  align-items:center;justify-content:center;flex-direction:column;gap:5px;padding:10px}
+.btn-hamburger span{display:block;width:18px;height:2px;background:rgba(255,255,255,.85);
+  border-radius:2px;transition:all .25s}
+.btn-hamburger.open span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.btn-hamburger.open span:nth-child(2){opacity:0;transform:scaleX(0)}
+.btn-hamburger.open span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+
+/* Overlay oscuro detrás del sidebar en mobile */
+.sidebar-overlay{display:none;position:fixed;inset:0;z-index:350;
+  background:rgba(10,21,32,.55);backdrop-filter:blur(2px)}
+.sidebar-overlay.show{display:block}
+
+@media(max-width:900px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .row-3-1,.row-2{grid-template-columns:1fr}
+  .main{padding:1rem .875rem}
+
+  /* Sidebar oculto por defecto, slide-in cuando tiene clase .open */
+  .sidebar{
+    position:fixed;top:0;left:0;z-index:360;
+    height:100%;transform:translateX(-100%);
+    transition:transform .28s cubic-bezier(.4,0,.2,1);
+    box-shadow:4px 0 24px rgba(0,0,0,.35)}
+  .sidebar.open{transform:translateX(0)}
+
+  /* Mostrar botón hamburguesa */
+  .btn-hamburger{display:flex}
+
+  /* Compensar el botón en la topbar */
+  .topbar{padding-left:52px}
+  .filter-bar{padding-left:0}
+  .global-breadcrumb{padding-left:52px}
+}
+
+/* ID badge para ADO */
+.id-badge{display:inline-block;font-size:9px;font-weight:700;color:var(--blue-el);
+  background:rgba(43,95,232,0.08);border:1px solid rgba(43,95,232,0.2);
+  border-radius:4px;padding:1px 5px;margin-right:6px;letter-spacing:.03em;
+  font-family:'Nunito Sans',monospace;cursor:default}
+.id-badge:hover{background:rgba(43,95,232,0.15)}
+
+/* Buscador inline en panel header */
+.search-input{padding:6px 10px;border:1.5px solid var(--border2);border-radius:var(--r);
+  font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--text);
+  background:var(--white);outline:none;width:220px;transition:border-color .2s}
+.search-input:focus{border-color:var(--blue-el)}
+.search-wrap{display:flex;align-items:center;gap:8px}
+.search-count{font-size:11px;color:var(--muted);white-space:nowrap}

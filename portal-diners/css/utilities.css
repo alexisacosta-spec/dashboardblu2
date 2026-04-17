@@ -1,0 +1,137 @@
+/* ── TOOLTIP INFO ── */
+.info-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:16px;height:16px;border-radius:50%;border:1.5px solid var(--muted);
+  color:var(--muted);font-size:9px;font-weight:700;cursor:pointer;flex-shrink:0;
+  margin-left:7px;line-height:1;user-select:none;transition:border-color .15s,color .15s}
+.info-btn:hover{border-color:var(--blue-el);color:var(--blue-el)}
+
+.info-tooltip{position:fixed;z-index:9999;max-width:280px;min-width:200px;
+  background:var(--bg-dark);color:rgba(255,255,255,.92);
+  border:1px solid rgba(43,95,232,.35);border-radius:var(--r-lg);
+  padding:12px 14px;font-size:11px;line-height:1.6;
+  box-shadow:0 8px 32px rgba(0,0,0,.35);pointer-events:none;
+  opacity:0;transition:opacity .15s}
+.info-tooltip.show{opacity:1}
+.info-tooltip-title{font-size:11px;font-weight:700;color:var(--blue-el3);
+  margin-bottom:5px;letter-spacing:.04em}
+.info-tooltip-body{color:rgba(255,255,255,.75)}
+.info-tooltip-formula{margin-top:6px;padding:5px 8px;
+  background:rgba(43,95,232,.12);border-radius:5px;
+  font-family:'Nunito Sans',monospace;font-size:10px;color:rgba(255,255,255,.9)}
+
+/* ── UX-05: Skeleton screens ── */
+@keyframes shimmer{0%{background-position:-600px 0}100%{background-position:600px 0}}
+.skel{display:block;border-radius:4px;
+  background:linear-gradient(90deg,#eaf0f8 25%,#d8e4f0 50%,#eaf0f8 75%);
+  background-size:600px 100%;animation:shimmer 1.4s infinite linear}
+.skel-tbl-row td{padding:9px 10px}
+.skel-pbar-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+
+/* ── UX-09: Empty states ── */
+.empty-state{text-align:center;padding:3rem 2rem}
+.empty-state-ico{font-size:2.25rem;line-height:1;margin-bottom:.75rem;opacity:.55}
+.empty-state-msg{font-size:14px;font-weight:700;color:var(--text2);margin-bottom:.4rem}
+.empty-state-hint{font-size:12px;color:var(--muted);line-height:1.55;max-width:340px;margin:0 auto}
+.empty-state-hint strong{color:var(--text2)}
+
+/* ── UX-03: Breadcrumb global ── */
+.global-breadcrumb{display:flex;align-items:center;gap:7px;font-size:11px;
+  color:var(--muted);margin-bottom:1.125rem}
+.global-breadcrumb .bc-sep{opacity:.35;font-size:10px}
+.global-breadcrumb .bc-current{color:var(--bg-dark);font-weight:700}
+.global-breadcrumb .bc-link{background:none;border:none;padding:0;cursor:pointer;
+  font-family:'Nunito Sans',sans-serif;font-size:11px;color:var(--muted);
+  text-decoration:underline;text-decoration-color:transparent;transition:.15s}
+.global-breadcrumb .bc-link:hover{color:var(--blue-el);text-decoration-color:var(--blue-el)}
+
+/* ── UX-14: Paginación de tablas ── */
+.pagination{display:flex;align-items:center;justify-content:center;gap:14px;
+  padding:11px 1.25rem;border-top:1px solid var(--border)}
+.pg-btn{padding:5px 14px;border:1.5px solid var(--border2);border-radius:var(--r);
+  background:var(--surface2);font-family:'Nunito Sans',sans-serif;font-size:11px;
+  font-weight:700;color:var(--muted);cursor:pointer;transition:all .2s}
+.pg-btn:hover{border-color:var(--blue-el);color:var(--blue-el);background:var(--white)}
+.pg-btn:disabled{opacity:.35;cursor:default;pointer-events:none}
+.pg-info{font-size:11px;font-weight:700;color:var(--muted)}
+
+/* ── UX-16: Gantt tooltip ── */
+.gantt-tip{position:fixed;z-index:900;pointer-events:none;display:none;
+  background:var(--bg-dark);color:var(--white);border-radius:var(--r);
+  padding:10px 14px;font-size:11px;line-height:1.65;max-width:270px;
+  box-shadow:0 8px 28px rgba(0,0,0,.38)}
+.gantt-tip strong{display:block;font-size:12px;font-weight:700;margin-bottom:5px;
+  color:var(--white);line-height:1.3}
+.gantt-tip-row{color:rgba(255,255,255,.65)}
+.gantt-tip-row b{color:var(--white);font-weight:600}
+.gantt-bar{cursor:pointer}
+
+/* ── Download button universal ── */
+.dl-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:var(--r);border:1.5px solid var(--border2);
+  background:var(--surface2);color:var(--muted);cursor:pointer;flex-shrink:0;
+  transition:all .18s;padding:0;position:relative}
+.dl-btn:hover{border-color:var(--blue-el);color:var(--blue-el);background:var(--white)}
+.dl-btn svg{width:14px;height:14px;pointer-events:none}
+
+/* ── Download dropdown menu ── */
+.dl-menu{position:fixed;z-index:9000;min-width:140px;
+  background:var(--white);border:1.5px solid var(--border2);
+  border-radius:var(--r);box-shadow:0 8px 24px rgba(13,27,46,.13);
+  overflow:hidden;opacity:0;transform:translateY(-4px);
+  transition:opacity .15s,transform .15s;pointer-events:none}
+.dl-menu.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.dl-menu-item{display:flex;align-items:center;gap:8px;padding:9px 14px;
+  font-family:'Nunito Sans',sans-serif;font-size:12px;font-weight:600;
+  color:var(--text2);cursor:pointer;transition:background .12s;white-space:nowrap}
+.dl-menu-item:hover{background:var(--surface2);color:var(--blue-el)}
+.dl-menu-item svg{width:13px;height:13px;flex-shrink:0;opacity:.7}
+.dl-menu-sep{height:1px;background:var(--border);margin:2px 0}
+
+/* ── UX-11: Filtros de log de accesos ── */
+.logs-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* ── Distribución de células ── */
+.celulas-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.celulas-grid{border-collapse:collapse;min-width:1000px;width:100%;font-size:12px;font-family:'Nunito Sans',sans-serif}
+.celulas-grid th,.celulas-grid td{border:1px solid var(--border);padding:7px 10px;text-align:center;vertical-align:middle;white-space:nowrap}
+.cg-rol-col{text-align:left!important;font-weight:600;color:var(--text2);background:var(--surface2);position:sticky;left:0;z-index:2;min-width:132px}
+.cg-rol-col-hdr{background:#0D1B2E!important;color:#fff!important;font-size:11px;letter-spacing:.6px;text-transform:uppercase;z-index:3!important}
+.celula-hdr{color:#fff!important;font-weight:700;font-size:11px;letter-spacing:.3px;padding:10px 14px!important;min-width:112px}
+.cg-count{display:inline-flex;align-items:center;gap:3px;font-weight:700;font-size:13px}
+.cg-scrum{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:12px;color:#fff;letter-spacing:.5px}
+.cg-dash{color:var(--muted);font-size:13px;font-weight:400}
+.cg-total-row td{font-weight:700;background:var(--surface2)!important;font-size:14px;border-top:2px solid var(--border2)}
+/* Edit mode: inputs visible, display spans hidden */
+.cg-input{width:44px;text-align:center;border:1.5px solid var(--border2);border-radius:4px;padding:3px 4px;font-size:12px;font-family:inherit;background:var(--white);display:none;transition:border .15s}
+.cg-input:focus{border-color:var(--blue-el);outline:none}
+.cg-checkbox{display:none;cursor:pointer;width:15px;height:15px;accent-color:var(--blue-el)}
+.celulas-edit-mode .cg-input{display:inline-block}
+.celulas-edit-mode .cg-checkbox{display:inline-block}
+.celulas-edit-mode .cg-count{display:none!important}
+.celulas-edit-mode .cg-dash{display:none!important}
+.celulas-edit-mode .cg-scrum{display:none!important}
+/* Funcionalidades cards */
+.celulas-feat-section{margin-top:20px}
+.celulas-feat-title{font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+.celulas-feat-row{display:flex;gap:10px;min-width:1000px}
+.celula-feat-card{flex:1;min-width:112px;background:var(--white);border:1.5px solid var(--border);border-radius:var(--r);overflow:hidden}
+.celula-feat-card-hdr{padding:8px 10px;font-size:10px;font-weight:700;color:#fff;letter-spacing:.3px;line-height:1.35;text-align:center}
+.celula-feat-list{padding:6px 8px;min-height:38px}
+.feat-item{display:flex;align-items:flex-start;gap:4px;padding:3px 0;font-size:11px;color:var(--text2);line-height:1.4}
+.feat-item-dot{color:var(--muted);flex-shrink:0;margin-top:1px;font-size:13px}
+.feat-item-text{flex:1;word-break:break-word;white-space:normal}
+.feat-item-del{background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;line-height:1;padding:0 2px;flex-shrink:0;display:none;transition:color .12s}
+.feat-item-del:hover{color:#C0392B}
+.feat-add-wrap{padding:4px 8px 8px;display:none}
+.feat-add-btn{width:100%;background:none;border:1.5px dashed var(--border2);border-radius:var(--r);padding:5px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .15s;font-family:'Nunito Sans',sans-serif}
+.feat-add-btn:hover{border-color:var(--blue-el);color:var(--blue-el);background:var(--surface2)}
+.celulas-edit-mode .feat-item-del{display:block}
+.celulas-edit-mode .feat-add-wrap{display:block}
+
+/* ── Inner tabs (Indicadores) ── */
+.ind-tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0}
+.ind-tab{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;
+  padding:8px 18px;font-family:'Nunito Sans',sans-serif;font-size:13px;font-weight:600;
+  color:var(--muted);cursor:pointer;transition:all .18s;border-radius:6px 6px 0 0}
+.ind-tab:hover{color:var(--text2);background:var(--surface2)}
+.ind-tab.active{color:var(--blue-el);border-bottom-color:var(--blue-el);background:var(--surface2)}
