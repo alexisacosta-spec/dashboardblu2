@@ -75,6 +75,14 @@ function emptyState(msg, hint='', icon='📭') {
 }
 
 // ─── GANTT TOOLTIP ────────────────────────────────────────────────────────────
+let _tipPinned = false; // true cuando el tooltip fue abierto por click (no hover)
+
+function _showTip(t, html, e) {
+  t.innerHTML = html;
+  t.style.display = 'block';
+  _posGanttTip(e);
+}
+
 function showStackTip(e, el) {
   const t = document.getElementById('gantt-tip');
   if (!t) return;
@@ -88,28 +96,32 @@ function showStackTip(e, el) {
   const pN = total ? (nuevas   / total * 100).toFixed(1) : 0;
   const pO = total ? (otros    / total * 100).toFixed(1) : 0;
   const dot = (color) => `<span style="display:inline-block;width:9px;height:9px;background:${color};border-radius:2px;margin-right:5px;vertical-align:middle"></span>`;
-  t.innerHTML = `<strong style="font-size:12px">Distribución de Tasks</strong>
+  _showTip(t, `<strong style="font-size:12px">Distribución de Tasks</strong>
     <div class="gantt-tip-row">${dot('#16A34A')} Cerradas: <b>${cerradas}</b> <span style="color:#9CA3AF">(${pC}%)</span></div>
     <div class="gantt-tip-row">${dot('#2563EB')} Activas: <b>${activas}</b> <span style="color:#9CA3AF">(${pA}%)</span></div>
     <div class="gantt-tip-row">${dot('#94A3B8')} Nuevas: <b>${nuevas}</b> <span style="color:#9CA3AF">(${pN}%)</span></div>
     ${otros > 0 ? `<div class="gantt-tip-row">${dot('#C084FC')} Otros: <b>${otros}</b> <span style="color:#9CA3AF">(${pO}%)</span></div>` : ''}
-    <div class="gantt-tip-row" style="border-top:1px solid #E5E7EB;margin-top:5px;padding-top:4px;font-weight:600">Total: ${total}</div>`;
-  t.style.display = '';
-  _posGanttTip(e);
+    <div class="gantt-tip-row" style="border-top:1px solid #E5E7EB;margin-top:5px;padding-top:4px;font-weight:600">Total: ${total}</div>`, e);
+}
+
+// Versión "pinned" para onclick: mouseleave no lo cierra
+function pinStackTip(e, el) {
+  _tipPinned = true;
+  showStackTip(e, el);
+  e.stopPropagation();
 }
 
 function showGanttTip(e, el) {
   const t = document.getElementById('gantt-tip');
   if (!t) return;
-  t.innerHTML = `<strong>${el.dataset.nombre||'—'}</strong>
+  _showTip(t, `<strong>${el.dataset.nombre||'—'}</strong>
     <div class="gantt-tip-row">📅 <b>${el.dataset.ini||'?'}</b> → <b>${el.dataset.fin||'?'}</b></div>
     <div class="gantt-tip-row">⏱ Lead Time: <b>${el.dataset.lt||'?'}d</b></div>
     <div class="gantt-tip-row">✅ Avance: <b>${el.dataset.pct||'0'}%</b> (${el.dataset.cerradas||0}/${el.dataset.total||0} tasks)</div>
     ${Number(el.dataset.horas) > 0 ? `<div class="gantt-tip-row">🕐 Horas: <b>${Math.round(Number(el.dataset.horas)).toLocaleString('es-EC')}h comp</b>${Number(el.dataset.horasEst) > 0 ? ` / ${Math.round(Number(el.dataset.horasEst)).toLocaleString('es-EC')}h est` : ''}</div>` : ''}
-    <div class="gantt-tip-row" style="margin-top:4px"><span style="background:${el.dataset.color||'#ccc'}30;color:${el.dataset.color||'#666'};border:1px solid ${el.dataset.color||'#ccc'}55;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700">${el.dataset.estado||'—'}</span></div>`;
-  t.style.display = '';
-  _posGanttTip(e);
+    <div class="gantt-tip-row" style="margin-top:4px"><span style="background:${el.dataset.color||'#ccc'}30;color:${el.dataset.color||'#666'};border:1px solid ${el.dataset.color||'#ccc'}55;padding:1px 8px;border-radius:20px;font-size:10px;font-weight:700">${el.dataset.estado||'—'}</span></div>`, e);
 }
+
 function _posGanttTip(e) {
   const t = document.getElementById('gantt-tip');
   if (!t) return;
@@ -120,7 +132,9 @@ function _posGanttTip(e) {
   t.style.left = x + 'px';
   t.style.top  = y + 'px';
 }
+
 function hideGanttTip() {
+  if (_tipPinned) return; // No ocultar si fue abierto por click
   const t = document.getElementById('gantt-tip');
   if (t) t.style.display = 'none';
 }

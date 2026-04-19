@@ -178,9 +178,10 @@ function _iaeStackBar(total, cerradas, activas, nuevas, otros) {
   const pA = (activas  / total * 100).toFixed(1);
   const pN = (nuevas   / total * 100).toFixed(1);
   const pO = (otros    / total * 100).toFixed(1);
-  return `<div class="iae-stack-wrap" style="cursor:default"
+  return `<div class="iae-stack-wrap" style="cursor:pointer"
     data-total="${total}" data-cerradas="${cerradas}" data-activas="${activas}" data-nuevas="${nuevas}" data-otros="${otros||0}"
-    onmouseenter="showStackTip(event,this)" onmousemove="_posGanttTip(event)" onmouseleave="hideGanttTip()">
+    onmouseenter="showStackTip(event,this)" onmousemove="_posGanttTip(event)" onmouseleave="hideGanttTip()"
+    onclick="pinStackTip(event,this)">
     <div class="iae-stack-bar" style="pointer-events:none">
       <div class="iae-seg-closed" style="width:${pC}%"></div>
       <div class="iae-seg-active" style="width:${pA}%"></div>
@@ -327,52 +328,116 @@ function _renderMainTable(iniciativas) {
   if (!iniciativas.length) return '<p style="color:var(--muted);padding:12px">No hay datos aún. Carga un CSV primero.</p>';
 
   const canDrill = typeof USER !== 'undefined' && USER?.perfil !== 'visor';
-
-  const legend = `<div style="display:flex;gap:16px;margin-top:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
-    <span><span style="display:inline-block;width:10px;height:8px;background:#16A34A;border-radius:2px;vertical-align:middle"></span> Cerradas</span>
-    <span><span style="display:inline-block;width:10px;height:8px;background:#2563EB;border-radius:2px;vertical-align:middle"></span> Activas</span>
-    <span><span style="display:inline-block;width:10px;height:8px;background:#94A3B8;border-radius:2px;vertical-align:middle"></span> Nuevas</span>
-    <span><span style="display:inline-block;width:10px;height:8px;background:#C084FC;border-radius:2px;vertical-align:middle"></span> Otros</span>
-    <span style="margin-left:8px"><span style="display:inline-block;width:22px;height:8px;background:rgba(59,130,246,.18);border-radius:2px;vertical-align:middle"></span> %Tareas · color sólido = IAE · brecha = penalización</span>
-  </div>`;
+  const total = iniciativas.length;
 
   const rows = iniciativas.map(r => {
     const sem = r.semaforo;
-    const drillAttr = canDrill ? `class="iae-drill" onclick="openIniTasks('${r.id_iniciativa}')" title="Ver tasks de esta iniciativa"` : '';
-    return `<tr>
-      <td ${drillAttr}>
+    const drillAttr = canDrill ? `onclick="openIniTasks('${r.id_iniciativa}')" title="Ver tasks de esta iniciativa"` : '';
+    const semColor = sem === 'verde' ? '#166534' : sem === 'naranja' ? '#B45309' : '#991B1B';
+    return `<tr class="iae-tbl-row${canDrill ? ' iae-drill' : ''}" data-nombre="${(r.nombre||'').toLowerCase()}" ${drillAttr}>
+      <td>
         <div style="display:flex;align-items:center;gap:6px">
-          <span class="iae-dot ${sem}"></span>
-          <span class="iae-ini-name-txt" style="font-weight:600;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.nombre}">${r.nombre}</span>
-          ${canDrill ? '<span style="font-size:10px;color:var(--muted)">›</span>' : ''}
+          <span class="iae-dot ${sem}" style="flex-shrink:0"></span>
+          <span class="iae-ini-name-txt" style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.nombre}">${r.nombre}</span>
+          ${canDrill ? '<span style="font-size:10px;color:var(--muted);flex-shrink:0">›</span>' : ''}
         </div>
       </td>
-      <td style="min-width:140px">${_iaeStackBar(r.total_tasks, r.cerradas, r.activas, r.nuevas, r.otros)}</td>
+      <td style="min-width:130px">${_iaeStackBar(r.total_tasks, r.cerradas, r.activas, r.nuevas, r.otros)}</td>
       <td class="num" style="font-weight:700;color:#2563EB">${_fmt1(r.pct_tareas)}%</td>
-      <td class="num">${r.h_est ? _fmt1(r.h_est)+'h' : '—'}</td>
-      <td class="num">${r.h_ejec ? _fmt1(r.h_ejec)+'h' : '—'}</td>
-      <td class="num" style="color:${r.pct_horas > 100 ? '#DC2626' : 'inherit'};font-weight:${r.pct_horas > 100 ? '700' : '400'}">${r.h_est ? _fmt1(r.pct_horas)+'%' : '—'}</td>
-      <td class="num" style="font-weight:700;color:${sem==='verde'?'#166534':sem==='naranja'?'#B45309':'#991B1B'}">${_fmt1(r.iae)}%</td>
-      <td style="min-width:110px">${_iaeBar(r.pct_tareas, r.iae, sem)}</td>
+      <td class="num" style="color:var(--muted)">${r.h_est ? _fmt1(r.h_est)+'h' : '—'}</td>
+      <td class="num" style="color:var(--muted)">${r.h_ejec ? _fmt1(r.h_ejec)+'h' : '—'}</td>
+      <td class="num" style="color:${r.pct_horas > 100 ? '#DC2626' : 'var(--muted)'};font-weight:${r.pct_horas > 100 ? '700' : '400'}">${r.h_est ? _fmt1(r.pct_horas)+'%' : '—'}</td>
+      <td class="num" style="font-weight:800;font-size:13px;color:${semColor}">${_fmt1(r.iae)}%</td>
+      <td style="min-width:100px">${_iaeBar(r.pct_tareas, r.iae, sem)}</td>
     </tr>`;
   }).join('');
 
-  return `<div style="overflow-x:auto">
-  <table class="iae-main-tbl">
-    <thead><tr>
-      <th>Iniciativa ${canDrill ? '<span style="font-size:9px;font-weight:400;opacity:.6">· clic para ver tasks</span>' : ''}</th>
-      <th style="min-width:160px">Tasks por estado</th>
-      <th class="num">%Tareas</th>
-      <th class="num">H.Est.</th>
-      <th class="num">H.Ejec.</th>
-      <th class="num">%Horas</th>
-      <th class="num">IAE</th>
-      <th style="min-width:110px">%Tareas vs IAE</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  ${legend}
+  const legend = `<div style="display:flex;gap:14px;margin-top:10px;flex-wrap:wrap;font-size:11px;color:var(--muted)">
+    <span><span style="display:inline-block;width:9px;height:9px;background:#16A34A;border-radius:2px;vertical-align:middle;margin-right:3px"></span>Cerradas</span>
+    <span><span style="display:inline-block;width:9px;height:9px;background:#2563EB;border-radius:2px;vertical-align:middle;margin-right:3px"></span>Activas</span>
+    <span><span style="display:inline-block;width:9px;height:9px;background:#94A3B8;border-radius:2px;vertical-align:middle;margin-right:3px"></span>Nuevas</span>
+    <span><span style="display:inline-block;width:9px;height:9px;background:#C084FC;border-radius:2px;vertical-align:middle;margin-right:3px"></span>Otros</span>
+    <span style="margin-left:6px"><span style="display:inline-block;width:20px;height:9px;background:rgba(59,130,246,.18);border-radius:2px;vertical-align:middle;margin-right:3px"></span>%Tareas · sólido = IAE · brecha = penalización</span>
   </div>`;
+
+  return `
+  <!-- Barra de búsqueda -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+    <div style="position:relative;flex:1;min-width:180px;max-width:360px">
+      <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--muted);pointer-events:none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="iae-search" type="text" placeholder="Buscar iniciativa…"
+        oninput="_iaeFilterRows(this.value)"
+        style="width:100%;padding:7px 30px 7px 30px;border:1.5px solid var(--border2);border-radius:var(--r);font-family:var(--font);font-size:12px;color:var(--text);background:var(--surface);outline:none;box-sizing:border-box;transition:border-color .15s"
+        onfocus="this.style.borderColor='var(--blue-el)'" onblur="this.style.borderColor='var(--border2)'">
+      <button id="iae-search-clear" onclick="_iaeClearSearch()" style="display:none;position:absolute;right:7px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--muted);font-size:15px;line-height:1;padding:2px 4px">×</button>
+    </div>
+    <span id="iae-row-count" style="font-size:11px;font-weight:600;color:var(--muted);background:var(--surface2);border:1px solid var(--border2);padding:4px 10px;border-radius:20px;white-space:nowrap">${total} iniciativa${total !== 1 ? 's' : ''}</span>
+  </div>
+
+  <!-- Tabla con scroll y header sticky -->
+  <div style="border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+    <div style="overflow-x:auto;overflow-y:auto;max-height:520px">
+      <table class="iae-main-tbl" id="iae-main-tbl" style="min-width:680px">
+        <thead id="iae-tbl-head" style="position:sticky;top:0;z-index:3">
+          <tr>
+            <th style="background:var(--surface2);border-bottom:1.5px solid var(--border)">
+              Iniciativa ${canDrill ? '<span style="font-size:9px;font-weight:400;opacity:.55">· clic para ver tasks</span>' : ''}
+            </th>
+            <th style="min-width:130px;background:var(--surface2);border-bottom:1.5px solid var(--border)">Tasks por estado</th>
+            <th class="num" style="background:var(--surface2);border-bottom:1.5px solid var(--border)">%Tareas</th>
+            <th class="num" style="background:var(--surface2);border-bottom:1.5px solid var(--border)">H.Est.</th>
+            <th class="num" style="background:var(--surface2);border-bottom:1.5px solid var(--border)">H.Ejec.</th>
+            <th class="num" style="background:var(--surface2);border-bottom:1.5px solid var(--border)">%Horas</th>
+            <th class="num" style="background:var(--surface2);border-bottom:1.5px solid var(--border)">IAE</th>
+            <th style="min-width:100px;background:var(--surface2);border-bottom:1.5px solid var(--border)">%Tareas vs IAE</th>
+          </tr>
+        </thead>
+        <tbody id="iae-tbl-body">${rows}</tbody>
+      </table>
+    </div>
+    <!-- Fila vacía si búsqueda no encuentra resultados -->
+    <div id="iae-no-results" style="display:none;padding:28px;text-align:center;color:var(--muted);font-size:13px">
+      🔍 Sin resultados para "<span id="iae-no-results-q"></span>"
+    </div>
+  </div>
+  ${legend}`;
+}
+
+// ─── FILTRO DE TABLA IAE ──────────────────────────────────────────────────────
+
+function _iaeFilterRows(val) {
+  const q = (val || '').toLowerCase().trim();
+  const rows   = document.querySelectorAll('#iae-tbl-body .iae-tbl-row');
+  const countEl  = document.getElementById('iae-row-count');
+  const clearEl  = document.getElementById('iae-search-clear');
+  const noRes    = document.getElementById('iae-no-results');
+  const noResQ   = document.getElementById('iae-no-results-q');
+  const tblWrap  = document.querySelector('#iae-main-tbl')?.parentElement;
+
+  let visible = 0;
+  rows.forEach(row => {
+    const match = !q || row.dataset.nombre.includes(q);
+    row.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+
+  const total = rows.length;
+  if (countEl) countEl.textContent = q
+    ? `${visible} de ${total} iniciativa${total !== 1 ? 's' : ''}`
+    : `${total} iniciativa${total !== 1 ? 's' : ''}`;
+  if (clearEl) clearEl.style.display = val ? '' : 'none';
+  if (noRes) {
+    const empty = visible === 0 && q;
+    noRes.style.display = empty ? '' : 'none';
+    if (tblWrap) tblWrap.style.display = empty ? 'none' : '';
+    if (noResQ && empty) noResQ.textContent = val;
+  }
+}
+
+function _iaeClearSearch() {
+  const inp = document.getElementById('iae-search');
+  if (inp) { inp.value = ''; inp.focus(); }
+  _iaeFilterRows('');
 }
 
 // ─── LEGEND ──────────────────────────────────────────────────────────────────

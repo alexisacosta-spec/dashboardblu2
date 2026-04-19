@@ -233,6 +233,15 @@ window.onclick = e => {
   document.querySelectorAll('.modal-overlay.show').forEach(m => {
     if (e.target === m) m.classList.remove('show');
   });
+  // Cerrar gantt-tip pinned al hacer clic fuera de la barra
+  const tip = document.getElementById('gantt-tip');
+  if (tip && tip.style.display === 'block') {
+    const isInsideBar = e.target.closest('.gantt-bar, .iae-stack-wrap');
+    if (!isInsideBar) {
+      _tipPinned = false;
+      tip.style.display = 'none';
+    }
+  }
 };
 
 // ─── PATCH showView: auto-open grupo + mobile sidebar ────────────────────────
