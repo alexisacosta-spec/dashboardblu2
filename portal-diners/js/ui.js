@@ -75,6 +75,29 @@ function emptyState(msg, hint='', icon='📭') {
 }
 
 // ─── GANTT TOOLTIP ────────────────────────────────────────────────────────────
+function showStackTip(e, el) {
+  const t = document.getElementById('gantt-tip');
+  if (!t) return;
+  const total    = +el.dataset.total    || 0;
+  const cerradas = +el.dataset.cerradas || 0;
+  const activas  = +el.dataset.activas  || 0;
+  const nuevas   = +el.dataset.nuevas   || 0;
+  const otros    = +el.dataset.otros    || 0;
+  const pC = total ? (cerradas / total * 100).toFixed(1) : 0;
+  const pA = total ? (activas  / total * 100).toFixed(1) : 0;
+  const pN = total ? (nuevas   / total * 100).toFixed(1) : 0;
+  const pO = total ? (otros    / total * 100).toFixed(1) : 0;
+  const dot = (color) => `<span style="display:inline-block;width:9px;height:9px;background:${color};border-radius:2px;margin-right:5px;vertical-align:middle"></span>`;
+  t.innerHTML = `<strong style="font-size:12px">Distribución de Tasks</strong>
+    <div class="gantt-tip-row">${dot('#16A34A')} Cerradas: <b>${cerradas}</b> <span style="color:#9CA3AF">(${pC}%)</span></div>
+    <div class="gantt-tip-row">${dot('#2563EB')} Activas: <b>${activas}</b> <span style="color:#9CA3AF">(${pA}%)</span></div>
+    <div class="gantt-tip-row">${dot('#94A3B8')} Nuevas: <b>${nuevas}</b> <span style="color:#9CA3AF">(${pN}%)</span></div>
+    ${otros > 0 ? `<div class="gantt-tip-row">${dot('#C084FC')} Otros: <b>${otros}</b> <span style="color:#9CA3AF">(${pO}%)</span></div>` : ''}
+    <div class="gantt-tip-row" style="border-top:1px solid #E5E7EB;margin-top:5px;padding-top:4px;font-weight:600">Total: ${total}</div>`;
+  t.style.display = '';
+  _posGanttTip(e);
+}
+
 function showGanttTip(e, el) {
   const t = document.getElementById('gantt-tip');
   if (!t) return;

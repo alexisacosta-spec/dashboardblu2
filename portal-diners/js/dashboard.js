@@ -39,10 +39,21 @@ async function showDashboard() {
       const permitido = oc.includes("'avance'") || oc.includes("'equipo'");
       if (!permitido) el.style.display = 'none';
     });
+    // Ocultar sub-ítems del grupo que no estén permitidos y el header si todos ocultos
+    document.querySelectorAll('.nav-grp-hdr').forEach(hdr => {
+      const grpId = hdr.id.replace('nav-grp-','').replace('-hdr','');
+      const items = document.getElementById('nav-grp-' + grpId);
+      if (!items) return;
+      const visible = Array.from(items.querySelectorAll('.nav-item')).some(el => el.style.display !== 'none');
+      if (!visible) hdr.style.display = 'none';
+    });
     const sbSec = document.querySelector('.sb-sec:not(#sb-admin-sec)');
     if (sbSec) sbSec.style.display = 'none';
   }
   // ─────────────────────────────────────────────────────────────────────────
+
+  // Abrir grupo Indicadores por defecto
+  openNavGrp('ind');
 
   initTooltipSystem();
   if (!isVisor) {
@@ -125,13 +136,14 @@ function applyFilters() {
 }
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
-const VISTAS_SIN_FILTROS = new Set(['avance','indicadores','equipo','tarifas','usuarios','historial','cargar','logs']);
+const VISTAS_SIN_FILTROS = new Set(['avance','indicadores','equipo','tarifas','usuarios','historial','cargar','logs','iae']);
 
 const VIEW_LABELS = {
   resumen:'Resumen ejecutivo', iniciativas:'Por iniciativa', empresas:'Por empresa',
   personas:'Por persona', categorias:'Por categoría', avance:'Avance y Delivery',
   indicadores:'Indicadores · Lead Time', equipo:'Equipo', tarifas:'Tarifas',
-  cargar:'Cargar CSV', historial:'Historial CSV', usuarios:'Usuarios', logs:'Log de accesos'
+  cargar:'Cargar CSV', historial:'Historial CSV', usuarios:'Usuarios', logs:'Log de accesos',
+  iae:'Índice de Avance Efectivo (IAE)'
 };
 
 function showView(name) {
@@ -157,8 +169,32 @@ function renderView(name) {
     personas:loadPersonas,categorias:loadCategorias,avance:loadAvance,
     indicadores:loadIndicadores,
     usuarios:loadUsuarios,equipo:loadEquipoView,tarifas:loadTarifas,
-    cargar:()=>{},historial:loadHistorialCSV,logs:loadLogs};
+    cargar:()=>{},historial:loadHistorialCSV,logs:loadLogs,
+    iae:loadIAE};
   if (map[name]) map[name]();
+}
+
+// ─── NAV GROUPS ───────────────────────────────────────────────────────────────
+// Vistas que pertenecen al grupo "Indicadores"
+const NAV_GROUPS = { ind: new Set(['indicadores','iae']) };
+
+function toggleNavGrp(id) {
+  const items = document.getElementById('nav-grp-' + id);
+  const arr   = document.getElementById('nav-grp-' + id + '-arr');
+  const hdr   = document.getElementById('nav-grp-' + id + '-hdr');
+  if (!items) return;
+  const open = items.classList.toggle('open');
+  if (arr) arr.classList.toggle('open', open);
+  if (hdr) hdr.classList.toggle('open', open);
+}
+
+function openNavGrp(id) {
+  const items = document.getElementById('nav-grp-' + id);
+  const arr   = document.getElementById('nav-grp-' + id + '-arr');
+  const hdr   = document.getElementById('nav-grp-' + id + '-hdr');
+  if (items) items.classList.add('open');
+  if (arr)   arr.classList.add('open');
+  if (hdr)   hdr.classList.add('open');
 }
 
 // ─── SIDEBAR MOBILE ───────────────────────────────────────────────────────────
@@ -199,9 +235,13 @@ window.onclick = e => {
   });
 };
 
-// ─── PATCH showView FOR MOBILE SIDEBAR ───────────────────────────────────────
+// ─── PATCH showView: auto-open grupo + mobile sidebar ────────────────────────
 const _origShowView = showView;
 window.showView = function(name) {
   _origShowView(name);
+  // Auto-abrir el grupo al que pertenece la vista
+  for (const [grpId, vistas] of Object.entries(NAV_GROUPS)) {
+    if (vistas.has(name)) { openNavGrp(grpId); break; }
+  }
   if (window.innerWidth <= 900) closeSidebar();
 };

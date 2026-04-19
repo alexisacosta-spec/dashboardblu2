@@ -1,5 +1,6 @@
 'use strict';
 const nodemailer = require('nodemailer');
+const logger     = require('./logger');
 
 const DEV_MODE = process.env.DEV_MODE === 'true';
 
@@ -11,7 +12,7 @@ const transporter = nodemailer.createTransport({
 });
 
 async function enviarOTP(email, nombre, codigo) {
-  if (DEV_MODE) { console.log(`\n📧 OTP para ${email}: ${codigo}\n`); return; }
+  if (DEV_MODE) { logger.debug(`[DEV] OTP para ${email}: ${codigo}`); return; }
   await transporter.sendMail({
     from: process.env.MAIL_FROM, to: email,
     subject: 'Código de verificación — Portal Canales',
@@ -20,7 +21,7 @@ async function enviarOTP(email, nombre, codigo) {
 }
 
 async function enviarResetPassword(email, nombre, codigo) {
-  if (DEV_MODE) { console.log(`\n🔑 RESET PASSWORD para ${email}: ${codigo}\n`); return; }
+  if (DEV_MODE) { logger.debug(`[DEV] Reset password para ${email}: ${codigo}`); return; }
   await transporter.sendMail({
     from: process.env.MAIL_FROM, to: email,
     subject: 'Restablecimiento de contraseña — Portal Canales',
@@ -30,7 +31,7 @@ async function enviarResetPassword(email, nombre, codigo) {
 
 async function enviarInvitacion(email, nombre, token, portalUrl) {
   const link = `${portalUrl}?invite=${token}`;
-  if (DEV_MODE) { console.log(`\n✉️  INVITACIÓN para ${email}: ${link}\n`); return; }
+  if (DEV_MODE) { logger.debug(`[DEV] Invitación para ${email}: ${link}`); return; }
   await transporter.sendMail({
     from: process.env.MAIL_FROM, to: email,
     subject: 'Bienvenido al Portal Canales — Activa tu cuenta',

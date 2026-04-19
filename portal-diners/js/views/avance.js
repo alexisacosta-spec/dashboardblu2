@@ -275,13 +275,20 @@ async function loadIniTasks(idIni, tab) {
 }
 
 // ─── DELIVERY PLAN ────────────────────────────────────────────────────────────
-function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
+// Parsea 'YYYY-MM-DD' como medianoche LOCAL (evita desplazamiento UTC)
+function _parseLD(s) {
+  if (!s) return null;
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function renderDeliveryPlan(rows, filtroDesde, filtroHasta, targetId = 'delivery-content') {
   const sorted = [...rows]
     .filter(r => r.nombre !== 'SIN PARENT' && r.fecha_ini && r.fecha_fin)
-    .sort((a,b) => new Date(a.fecha_ini) - new Date(b.fecha_ini));
+    .sort((a,b) => _parseLD(a.fecha_ini) - _parseLD(b.fecha_ini));
 
   if (!sorted.length) {
-    document.getElementById('delivery-content').innerHTML =
+    document.getElementById(targetId).innerHTML =
       emptyState('Sin datos de fechas disponibles','No hay iniciativas con fechas de inicio y fin registradas en el rango seleccionado.','📅');
     return;
   }
@@ -290,11 +297,11 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
 
   let rangeStart, rangeEnd;
   if (filtroDesde && filtroHasta) {
-    rangeStart = new Date(filtroDesde);
-    rangeEnd   = new Date(filtroHasta);
+    rangeStart = _parseLD(filtroDesde);
+    rangeEnd   = _parseLD(filtroHasta);
   } else {
-    const allIni = sorted.map(r => new Date(r.fecha_ini));
-    const allFin = sorted.map(r => new Date(r.fecha_fin));
+    const allIni = sorted.map(r => _parseLD(r.fecha_ini));
+    const allFin = sorted.map(r => _parseLD(r.fecha_fin));
     rangeStart = new Date(Math.min(...allIni));
     rangeEnd   = new Date(Math.max(...allFin));
   }
@@ -324,16 +331,31 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
   }
   const months = [...monthMap.values()];
 
+  // ── Alternating month shading strips (for bar rows) ──
+  const monthShades = months.map((m, idx) => {
+    if (!m.days.length) return '';
+    const leftPct  = (m.days[0] - rangeStart) / 86400000 / rangeDays * 100;
+    const widthPct = m.days.length / rangeDays * 100;
+    const bg = idx % 2 === 1 ? 'rgba(100,116,139,.07)' : 'transparent';
+    return `<div style="position:absolute;top:0;bottom:0;left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;background:${bg};pointer-events:none;z-index:0"></div>`;
+  }).join('');
+
   const monthsHdr = months.map(m => {
     const monthWidthPct = m.days.length / rangeDays * 100;
-    const daysInner = m.days.map(d => {
-      const isMonday = d.getDay() === 1;
-      const borderStyle = isMonday ? 'border-left:1px solid var(--border2)' : '';
-      return `<div class="gantt-day-lbl" style="${borderStyle}">${d.getDate()}</div>`;
+    // Agrupar días en segmentos de semana (cortar antes de cada lunes)
+    const segments = [];
+    let segStart = 0;
+    for (let i = 1; i < m.days.length; i++) {
+      if (m.days[i].getDay() === 1) { segments.push(m.days.slice(segStart, i)); segStart = i; }
+    }
+    segments.push(m.days.slice(segStart));
+    const weeksInner = segments.map(seg => {
+      const w = (seg.length / m.days.length * 100).toFixed(2);
+      return `<div class="gantt-week-lbl" style="width:${w}%;flex:none">${seg[0].getDate()}</div>`;
     }).join('');
     return `<div class="gantt-hdr-month-block" style="width:${monthWidthPct.toFixed(2)}%">
       <div class="gantt-month-lbl">${m.label}</div>
-      <div class="gantt-hdr-weeks">${daysInner}</div>
+      <div class="gantt-hdr-weeks">${weeksInner}</div>
     </div>`;
   }).join('');
 
@@ -346,7 +368,7 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
   }).join('');
 
   function clasificar(r) {
-    const fin      = new Date(r.fecha_fin); fin.setHours(0,0,0,0);
+    const fin      = _parseLD(r.fecha_fin);
     const diasRest = Math.round((fin - today) / 86400000);
     const pct      = r.pct || 0;
     if (pct >= 100) return { estado: 'Completada',              color: '#3B5EA6' };
@@ -355,9 +377,9 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
     return { estado: `En tiempo · ${diasRest}d`, color: '#2D7A4F' };
   }
 
-  const barsHtml = sorted.map(r => {
-    const ini = new Date(r.fecha_ini);
-    const fin = new Date(r.fecha_fin);
+  const barsHtml = sorted.map((r, rowIdx) => {
+    const ini = _parseLD(r.fecha_ini);
+    const fin = _parseLD(r.fecha_fin);
     const visStart = new Date(Math.max(ini.getTime(), rangeStart.getTime()));
     const visEnd   = new Date(Math.min(fin.getTime(), rangeEnd.getTime()));
     if (visStart > visEnd) return '';
@@ -377,8 +399,9 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
         </div>
       </div>
       <div class="gantt-track">
+        ${monthShades}
         ${vlines}
-        <div class="gantt-today" style="left:${todayPct.toFixed(1)}%"><span class="gantt-today-lbl">hoy</span></div>
+        <div class="gantt-today" style="left:${todayPct.toFixed(1)}%">${rowIdx === 0 ? '<span class="gantt-today-lbl">hoy</span>' : ''}</div>
         <div class="gantt-bar"
           data-nombre="${esc(r.nombre)}"
           data-ini="${dIni}" data-fin="${dFin}"
@@ -396,11 +419,16 @@ function renderDeliveryPlan(rows, filtroDesde, filtroHasta) {
     </div>`;
   }).filter(Boolean).join('');
 
-  document.getElementById('delivery-content').innerHTML = `
+  document.getElementById(targetId).innerHTML = `
     <div class="gantt-outer"><div class="gantt-inner">
       <div class="gantt-hdr-row">
         <div class="gantt-label"></div>
-        <div class="gantt-months gantt-hdr-months">${monthsHdr}</div>
+        <div class="gantt-months gantt-hdr-months" style="position:relative">
+          ${monthsHdr}
+          <div style="position:absolute;top:0;bottom:0;left:${todayPct.toFixed(1)}%;width:2px;background:#D92B2B;z-index:10;border-radius:1px;pointer-events:none">
+            <span style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);font-size:8px;font-weight:800;color:#D92B2B;white-space:nowrap">HOY</span>
+          </div>
+        </div>
       </div>
       ${barsHtml}
     </div></div>

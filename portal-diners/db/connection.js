@@ -2,6 +2,7 @@
 const path     = require('path');
 const { Database } = require('node-sqlite3-wasm');
 const bcrypt   = require('bcryptjs');
+const logger   = require('../lib/logger');
 
 const DB_PATH = path.join(__dirname, '..', 'portal.db');
 const db = new Database(DB_PATH);
@@ -121,7 +122,7 @@ const currentVersion = parseInt(
   (db.get("SELECT value FROM _meta WHERE key='schema_version'") || {value:'0'}).value
 );
 if (currentVersion < SCHEMA_VERSION) {
-  console.log(`🔄 Migrando BD de v${currentVersion} a v${SCHEMA_VERSION}…`);
+  logger.info(`Migrando BD de v${currentVersion} → v${SCHEMA_VERSION}`);
   db.run('DROP TABLE IF EXISTS datos_horas');
   db.run('DROP TABLE IF EXISTS tasks_plan');
   db.run('DROP TABLE IF EXISTS tasks_seguimiento');
@@ -203,19 +204,39 @@ if (!colsHist.includes('log_error')) {
   db.run("ALTER TABLE historial_csv ADD COLUMN log_error TEXT");
 }
 
+db.run(`CREATE TABLE IF NOT EXISTS alertas (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  tipo           TEXT NOT NULL,
+  severidad      TEXT NOT NULL,
+  id_iniciativa  TEXT NOT NULL,
+  nombre_ini     TEXT NOT NULL,
+  iae            REAL,
+  pct_tareas     REAL,
+  pct_horas      REAL,
+  tasks_json     TEXT DEFAULT '[]',
+  estado         TEXT DEFAULT 'nueva',
+  nota           TEXT,
+  detectada_en   TEXT DEFAULT (datetime('now')),
+  reconocida_por TEXT,
+  reconocida_en  TEXT,
+  resuelta_en    TEXT
+)`);
+// Índice para consultas frecuentes
+db.run(`CREATE INDEX IF NOT EXISTS idx_alertas_estado ON alertas(estado)`);
+
 // ─── ADMIN INICIAL DESDE VARIABLES DE ENTORNO ─────────────────────────────────
 const ADMIN_EMAIL    = process.env.ADMIN_EMAIL;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const ADMIN_NOMBRE   = process.env.ADMIN_NOMBRE || 'Administrador';
 if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
-  console.warn('⚠️  ADVERTENCIA: ADMIN_EMAIL o ADMIN_PASSWORD no están en .env. No se creará el usuario admin inicial.');
+  logger.warn('ADMIN_EMAIL o ADMIN_PASSWORD no están en .env — no se creará el usuario admin inicial.');
 } else {
   const adminExiste = db.get('SELECT id FROM usuarios WHERE email = ?', [ADMIN_EMAIL.toLowerCase()]);
   if (!adminExiste) {
     const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
     db.run('INSERT INTO usuarios (nombre,email,password_hash,perfil) VALUES (?,?,?,?)',
       [ADMIN_NOMBRE, ADMIN_EMAIL.toLowerCase(), hash, 'admin']);
-    console.log(`\n✅ Usuario admin creado: ${ADMIN_EMAIL}\n`);
+    logger.info(`Usuario admin creado: ${ADMIN_EMAIL}`);
   }
 }
 

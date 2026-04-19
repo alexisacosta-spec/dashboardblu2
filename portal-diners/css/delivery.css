@@ -147,12 +147,10 @@
 .gantt-month-lbl{font-size:9px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
   color:var(--text2);padding:3px 6px 2px;white-space:nowrap}
 .gantt-hdr-weeks{display:flex;flex:1;border-top:0.5px solid var(--border2)}
-.gantt-week-lbl{flex:1;text-align:center;font-size:8px;color:var(--muted);padding:2px 0;
-  border-right:0.5px solid var(--border2);white-space:nowrap;overflow:hidden}
+.gantt-week-lbl{flex:none;text-align:center;font-size:9px;font-weight:600;color:var(--muted);
+  padding:2px 0;border-right:0.5px solid var(--border2);white-space:nowrap;overflow:hidden;
+  min-width:0}
 .gantt-week-lbl:last-child{border-right:none}
-.gantt-day-lbl{flex:1;text-align:center;font-size:7px;color:var(--muted);padding:2px 0;
-  border-right:0.5px solid var(--border);white-space:nowrap;overflow:hidden;min-width:0}
-.gantt-day-lbl:last-child{border-right:none}
 .gantt-vline-week{position:absolute;top:0;bottom:0;width:0.5px;background:var(--border)}
 .gantt-vline-month{position:absolute;top:0;bottom:0;width:1px;background:var(--border2)}
 

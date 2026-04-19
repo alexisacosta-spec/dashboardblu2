@@ -1,6 +1,7 @@
 'use strict';
-const jwt = require('jsonwebtoken');
-const db  = require('../db/connection');
+const jwt    = require('jsonwebtoken');
+const db     = require('../db/connection');
+const logger = require('../lib/logger');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 
@@ -22,7 +23,7 @@ function auditLog(email, evento, detalle, ip) {
       `INSERT INTO sesiones_log (email, evento, ip, detalle) VALUES (?,?,?,?)`,
       [email || '', evento, ip || '', detalle ? JSON.stringify(detalle) : null]
     );
-  } catch(e) { console.error('auditLog error:', e.message); }
+  } catch(e) { logger.error('auditLog error', e); }
 }
 
 // ─── SEC-06: authMiddleware verifica token Y blocklist ───────────────────────
@@ -37,7 +38,10 @@ function authMiddleware(req, res, next) {
     }
     req.user = decoded;
     next();
-  } catch { res.status(401).json({ error: 'Sesión expirada' }); }
+  } catch {
+    logger.warn(`Token inválido o expirado — ${req.method} ${req.originalUrl}`);
+    res.status(401).json({ error: 'Sesión expirada' });
+  }
 }
 
 // ─── adminOnly: solo perfil admin ────────────────────────────────────────────
