@@ -123,14 +123,6 @@ const IAE_STYLES = `
 .iae-ini-badge.naranja { background: #FEF3C7; color: #92400E; }
 .iae-ini-badge.rojo    { background: #FEE2E2; color: #991B1B; }
 
-/* ── Reconocer btn ── */
-.iae-reconocer-btn {
-  font-size: 11px; padding: 4px 12px;
-  border: 1px solid var(--border2); border-radius: 4px;
-  background: var(--surface); color: var(--text2);
-  cursor: pointer; margin-left: auto; flex-shrink: 0;
-}
-.iae-reconocer-btn:hover { background: var(--surface2); }
 
 /* ── Main table ── */
 .iae-main-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -247,15 +239,11 @@ function _renderCriticalOpenSection(critical_open, alertasMap) {
     const alerta = alertasMap[`TASKS_ABIERTAS_CRITICO::${id_ini}`];
     const iaeVal = alerta ? _fmt1(alerta.iae) + '%' : '—';
     const sem    = alerta && alerta.iae >= 85 ? 'verde' : alerta && alerta.iae >= 70 ? 'naranja' : 'rojo';
-    const reconBtn = alerta && !['reconocida','resuelta'].includes(alerta.estado)
-      ? `<button class="iae-reconocer-btn" onclick="_iaeReconocer(${alerta.id}, this)">Reconocer</button>`
-      : alerta?.estado === 'reconocida' ? `<span style="font-size:11px;color:var(--muted)">✓ Reconocida</span>` : '';
     html += `<div class="iae-ini-block">
       <div class="iae-ini-block-hdr">
         <span class="iae-dot ${sem}"></span>
         <span style="flex:1">${data.nombre}</span>
         <span class="iae-ini-badge ${sem}">IAE ${iaeVal}</span>
-        ${reconBtn}
       </div>
       <div>
         <div style="font-size:11px;color:var(--muted);margin-bottom:5px">${data.tasks.length} task${data.tasks.length!==1?'s':''} sin cerrar — IDs en ADO:</div>
@@ -285,13 +273,7 @@ function _renderPlaceholderSection(placeholder, alertasMap) {
       <td><span style="font-size:11px;color:var(--muted)">${t.estado||'—'}</span></td>
     </tr>`;
   }
-  html += '</tbody></table><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
-  for (const [id_ini, data] of Object.entries(byIni)) {
-    const alerta = alertasMap[`HORAS_PLACEHOLDER::${id_ini}`];
-    if (alerta && !['reconocida','resuelta'].includes(alerta.estado))
-      html += `<button class="iae-reconocer-btn" onclick="_iaeReconocer(${alerta.id},this)">Reconocer · ${data.nombre.substring(0,30)}</button>`;
-  }
-  html += '</div></div>';
+  html += '</tbody></table></div>';
   return _renderCollapsible('placeholder', '🟠', 'Horas placeholder (&ge; 100h por task)', placeholder.length, 'advertencia', html);
 }
 
@@ -312,13 +294,7 @@ function _renderZeroEstSection(zero_estimate, alertasMap) {
       <td><span style="font-size:11px;color:var(--muted)">${t.estado||'—'}</span></td>
     </tr>`;
   }
-  html += '</tbody></table><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">';
-  for (const [id_ini, data] of Object.entries(byIni)) {
-    const alerta = alertasMap[`ZERO_ESTIMATE::${id_ini}`];
-    if (alerta && !['reconocida','resuelta'].includes(alerta.estado))
-      html += `<button class="iae-reconocer-btn" onclick="_iaeReconocer(${alerta.id},this)">Reconocer · ${data.nombre.substring(0,30)}</button>`;
-  }
-  html += '</div></div>';
+  html += '</tbody></table></div>';
   return _renderCollapsible('zero', 'ℹ️', 'Sin estimación con horas ejecutadas', zero_estimate.length, 'info', html);
 }
 
@@ -440,63 +416,6 @@ function _iaeClearSearch() {
   _iaeFilterRows('');
 }
 
-// ─── LEGEND ──────────────────────────────────────────────────────────────────
-
-function _renderLegend() {
-  return `
-  <div class="panel" style="margin-top:20px">
-    <div class="panel-hdr"><div class="panel-title">Metodología · IAE</div></div>
-    <div class="panel-body">
-      <div class="iae-legend-grid">
-        <div class="iae-legend-sect">
-          <div class="iae-legend-title">Fórmula</div>
-          <div class="iae-formula-box">
-            %Tareas = Cerradas / Total × 100<br>
-            %Horas  = H.Ejecutadas / H.Estimadas × 100<br>
-            Eficiencia = min(1, %Tareas / %Horas)<br>
-            <strong>IAE = %Tareas × Eficiencia</strong>
-          </div>
-          <div style="font-size:12px;color:var(--muted);line-height:1.7">
-            Sin sobreejecución de horas → Eficiencia = 1 → IAE = %Tareas sin penalización.<br>
-            Con sobreejecución → IAE se reduce proporcionalmente.
-          </div>
-        </div>
-        <div class="iae-legend-sect">
-          <div class="iae-legend-title">Semáforo</div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div style="display:flex;align-items:center;gap:10px">
-              <span class="iae-dot verde" style="width:13px;height:13px"></span>
-              <div><strong style="color:#166534">En Control · IAE ≥ 85%</strong><br>
-                <span style="font-size:11px;color:var(--muted)">Avance y horas alineados con el plan</span></div>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px">
-              <span class="iae-dot naranja" style="width:13px;height:13px"></span>
-              <div><strong style="color:#92400E">Advertencia · IAE 70–84%</strong><br>
-                <span style="font-size:11px;color:var(--muted)">Desvío moderado — requiere atención</span></div>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px">
-              <span class="iae-dot rojo" style="width:13px;height:13px"></span>
-              <div><strong style="color:#991B1B">Crítico · IAE &lt; 70%</strong><br>
-                <span style="font-size:11px;color:var(--muted)">Riesgo alto — intervención necesaria</span></div>
-            </div>
-          </div>
-        </div>
-        <div class="iae-legend-sect">
-          <div class="iae-legend-title">Anomalías de calidad</div>
-          <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted);line-height:1.6">
-            <div>🔴 <strong>Tasks abiertas en críticos</strong> — cerrarlas en ADO mejora el IAE</div>
-            <div>🟠 <strong>Horas placeholder ≥ 100h</strong> — distorsionan %Horas e IAE</div>
-            <div>ℹ️ <strong>Sin estimación + horas ejecutadas</strong> — imposibilitan el cálculo correcto</div>
-            <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border2)">
-              Corrige en ADO con el #ID mostrado y recarga el CSV.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>`;
-}
-
 // ─── RENDER VIEW ─────────────────────────────────────────────────────────────
 
 function _renderIAEView(resumen, anomalias, alertas) {
@@ -516,7 +435,17 @@ function _renderIAEView(resumen, anomalias, alertas) {
         <div class="page-title">Índice de Avance Efectivo (IAE)</div>
         <div class="page-sub">Avance por tareas · eficiencia de horas · cronograma de entrega</div>
       </div>
-      <button class="btn-sec" onclick="loadIAE()" style="flex-shrink:0">↻ Actualizar</button>
+      <div style="display:flex;gap:8px;flex-shrink:0;align-items:center">
+        <button class="btn-sec" onclick="document.getElementById('modal-iae-metodologia').classList.add('show')"
+          style="display:flex;align-items:center;gap:6px;font-size:12px">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          Metodología
+        </button>
+        <button class="btn-sec" onclick="loadIAE()" style="display:flex;align-items:center;gap:5px;font-size:12px">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+          Actualizar
+        </button>
+      </div>
     </div>
 
     <!-- KPIs -->
@@ -586,9 +515,6 @@ function _renderIAEView(resumen, anomalias, alertas) {
       <div class="panel-body" id="iae-delivery-content"><div class="loader">Cargando cronograma…</div></div>
     </div>
 
-    <!-- Legend -->
-    ${_renderLegend()}
-
   </div>`;
 }
 
@@ -655,17 +581,4 @@ function _iaeToggleCol(id) {
   if (arr) arr.classList.toggle('open', isOpen);
 }
 
-async function _iaeReconocer(alertId, btn) {
-  if (!alertId) return;
-  try {
-    btn.disabled    = true;
-    btn.textContent = 'Reconociendo…';
-    await api(`/api/iae/alertas/${alertId}/reconocer`, 'POST', {});
-    toast('Alerta reconocida ✓');
-    loadIAE();
-  } catch (e) {
-    btn.disabled    = false;
-    btn.textContent = 'Reconocer';
-    toast('Error: ' + (e.message || e), 'error');
-  }
-}
+

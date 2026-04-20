@@ -20,7 +20,12 @@ async function api(url, method='GET', body=null) {
   const r = await fetch(url, opts);
   if (r.status === 401) { sessionExpired(); return; }
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error || 'Error del servidor');
+  if (!r.ok) {
+    if (typeof clientLog !== 'undefined') {
+      clientLog('API_ERROR', { url: url.split('?')[0], status: r.status, error: data.error });
+    }
+    throw new Error(data.error || 'Error del servidor');
+  }
   return data;
 }
 

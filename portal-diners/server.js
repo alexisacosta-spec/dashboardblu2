@@ -30,6 +30,7 @@ const datosRoutes       = require('./routes/datos');
 const indicadoresRoutes = require('./routes/indicadores');
 const celulasRoutes     = require('./routes/celulas');
 const { router: iaeRoutes } = require('./routes/iae');
+const clientLogsRoutes      = require('./routes/client-logs');
 
 // ─── APP ──────────────────────────────────────────────────────────────────────
 const app  = express();
@@ -51,6 +52,7 @@ app.use('/api/datos',        datosRoutes);
 app.use('/api/indicadores',  indicadoresRoutes);
 app.use('/api/celulas',      celulasRoutes);
 app.use('/api/iae',          iaeRoutes);
+app.use('/api/logs/client', clientLogsRoutes);
 
 // Ruta de equipo para todos los perfiles autenticados (no solo admin)
 app.get('/api/equipo', authMiddleware, (req, res) => {

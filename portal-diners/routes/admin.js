@@ -9,7 +9,6 @@ const db                               = require('../db/connection');
 const { authMiddleware, adminOnly, auditLog, validatePassword } = require('../middleware/auth');
 const { uploadCSV, uploadXLSX }        = require('../middleware/security');
 const { enviarInvitacion }             = require('../lib/email');
-const logger                           = require('../lib/logger');
 
 const PORT = process.env.PORT || 3000;
 
@@ -50,7 +49,7 @@ router.post('/usuarios', authMiddleware, adminOnly, async (req, res) => {
     res.json({ ok: true });
   } catch(e) {
     if (e.message?.includes('UNIQUE')) return res.status(409).json({ error: 'El email ya existe' });
-    logger.error('createUser error', e);
+    req.log.error('createUser error', e);
     res.status(500).json({ error: 'Error al crear el usuario' });
   }
 });
@@ -87,7 +86,7 @@ router.post('/usuarios/:id/reinvitar', authMiddleware, adminOnly, async (req, re
   const expira = new Date(Date.now() + 48*60*60*1000).toISOString().replace('T',' ').split('.')[0];
   db.run('INSERT INTO invitaciones (user_id,token,expira_en) VALUES (?,?,?)', [id, token, expira]);
   const portalUrl = process.env.PORTAL_URL || `http://localhost:${PORT}`;
-  await enviarInvitacion(user.email, user.nombre, token, portalUrl).catch(e => logger.error(`Reinvite email error (${user.email})`, e));
+  await enviarInvitacion(user.email, user.nombre, token, portalUrl).catch(e => req.log.error(`Reinvite email error (${user.email})`, e));
   auditLog(req.user.email, 'USUARIO_REINVITADO', { email: user.email }, req.ip);
   res.json({ ok: true });
 });
@@ -163,10 +162,11 @@ router.post('/equipo/importar', authMiddleware, adminOnly, uploadXLSX.single('ar
         agregados++;
       }
     }
-    logger.info(`Equipo importado: ${agregados} nuevos · ${actualizados} actualizados`);
+    req.log.info(`Equipo importado: ${agregados} nuevos · ${actualizados} actualizados`);
+    req.log.audit('EQUIPO_IMPORTADO', { nuevos: agregados, actualizados, archivo: req.file?.originalname });
     res.json({ ok: true, agregados, actualizados, errores });
   } catch(e) {
-    logger.error('Error importando equipo', e);
+    req.log.error('Error importando equipo', e);
     res.status(500).json({ error: 'Error procesando el archivo: ' + e.message });
   } finally {
     if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch(_) {} }
@@ -255,7 +255,7 @@ router.post('/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('archivo'
     }
 
     const raw = parseCSV(contenido);
-    logger.info(`CSV cargado: ${raw.length} filas`);
+    req.log.info(`CSV cargado: ${raw.length} filas`);
 
     const normId = v => {
       const s = String(v || '').trim();
@@ -328,7 +328,7 @@ router.post('/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('archivo'
     });
 
     const tasks = raw.filter(r => (r['Work Item Type']||'').trim() === 'Task');
-    logger.debug(`Tasks en CSV: ${tasks.length}`);
+    req.log.debug(`Tasks en CSV: ${tasks.length}`);
 
     const noValidos = [], procesadas = [];
     for (const r of tasks) {
@@ -388,7 +388,7 @@ router.post('/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('archivo'
     db.run('COMMIT');
 
     const bugsRaw = raw.filter(r => (r['Work Item Type']||'').trim() === 'Bug');
-    logger.debug(`Bugs en CSV: ${bugsRaw.length}`);
+    req.log.debug(`Bugs en CSV: ${bugsRaw.length}`);
     db.run('DELETE FROM bugs_csv');
     db.run('BEGIN TRANSACTION');
     let bugsInsertados = 0;
@@ -421,7 +421,7 @@ router.post('/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('archivo'
       bugsInsertados++;
     }
     db.run('COMMIT');
-    logger.debug(`Bugs insertados: ${bugsInsertados}`);
+    req.log.debug(`Bugs insertados: ${bugsInsertados}`);
 
     const planMap = {};
     for (const t of procesadas) {
@@ -468,7 +468,8 @@ router.post('/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('archivo'
 
     const checkH = db.get('SELECT COUNT(*) as n FROM datos_horas').n;
     const checkP = db.get('SELECT COUNT(*) as n FROM tasks_plan').n;
-    logger.info(`CSV procesado: ${insertadas} tasks · ${checkP} iniciativas · ${noValidos.length} correos sin lookup`);
+    req.log.info(`CSV procesado: ${insertadas} tasks · ${checkP} iniciativas · ${noValidos.length} correos sin lookup`);
+    req.log.audit('CSV_CARGADO', { archivo: req.file?.originalname, tasks: insertadas, iniciativas: checkP, sin_lookup: noValidos.length });
 
     const snapHoras = JSON.stringify(db.all('SELECT * FROM datos_horas'));
     const snapPlan  = JSON.stringify(db.all('SELECT * FROM tasks_plan'));
@@ -487,16 +488,28 @@ router.post('/cargar-csv', authMiddleware, adminOnly, uploadCSV.single('archivo'
     // Generar / actualizar alertas IAE automáticamente tras cada carga
     try {
       const { generarAlertas } = require('./iae');
-      const resAlertas = generarAlertas();
-      logger.info(`IAE post-carga: ${resAlertas.nuevas} nuevas alertas · ${resAlertas.total} activas`);
+      const resAlertas = generarAlertas(req.log);
+      req.log.info(`IAE post-carga: ${resAlertas.nuevas} nuevas alertas · ${resAlertas.total} activas`);
+
+      // Notificar a admins por email si hay alertas activas tras la carga
+      if (resAlertas.total > 0) {
+        const archivo = req.file?.originalname || 'archivo.csv';
+        const admins  = db.all("SELECT nombre, email FROM usuarios WHERE perfil='admin' AND activo=1");
+        if (admins.length > 0) {
+          const { enviarAlertasIAE } = require('../lib/email');
+          enviarAlertasIAE(admins, resAlertas.todasDetalle, archivo, resAlertas.nuevas)
+            .then(() => req.log.info(`Email IAE enviado a ${admins.length} admin(s) — ${resAlertas.total} activas, ${resAlertas.nuevas} nuevas`))
+            .catch(e  => req.log.warn(`Email IAE falló: ${e?.message || e}`));
+        }
+      }
     } catch (eAlertas) {
-      logger.warn('No se pudieron generar alertas IAE', eAlertas);
+      req.log.warn(`No se pudieron generar alertas IAE: ${eAlertas?.message || eAlertas}`);
     }
 
     res.json({ ok: true, tasks_total: tasks.length, tasks_con_horas: insertadas, iniciativas: checkP, sin_lookup: noValidos });
   } catch(e) {
     try { db.run('ROLLBACK'); } catch(_) {}
-    logger.error('Error procesando CSV', e);
+    req.log.error('Error procesando CSV', e);
     try {
       db.run(`INSERT INTO historial_csv (nombre_archivo,usuario,tasks_cargadas,iniciativas,sin_lookup,estado,log_error,snapshot_horas,snapshot_plan) VALUES (?,?,?,?,?,?,?,?,?)`,
         [req.file?.originalname || 'archivo.csv', req.user?.email || '', 0, 0, 0, 'error', e.message, null, null]);
@@ -546,7 +559,8 @@ router.post('/historial-csv/:id/restaurar', authMiddleware, adminOnly, (req, res
          r.total_tasks,r.cerradas,r.activas,r.nuevas,r.fecha_ini,r.fecha_fin]);
     }
     db.run('COMMIT');
-    logger.info(`Snapshot restaurado: ${registro.nombre_archivo}`);
+    req.log.info(`Snapshot restaurado: ${registro.nombre_archivo}`);
+    req.log.audit('SNAPSHOT_RESTAURADO', { archivo: registro.nombre_archivo, tasks: horasData.length, iniciativas: planData.length });
     auditLog(req.user.email, 'CSV_RESTAURADO', { archivo: registro.nombre_archivo, tasks: horasData.length, iniciativas: planData.length }, req.ip);
     res.json({ ok: true, tasks: horasData.length, iniciativas: planData.length });
   } catch(e) {

@@ -127,34 +127,21 @@ router.get('/alertas', authMiddleware, (req, res) => {
     detectada_en DESC`));
 });
 
-// ─── POST /api/iae/alertas/:id/reconocer ─────────────────────────────────────
-
-router.post('/alertas/:id/reconocer', authMiddleware, (req, res) => {
-  const { nota } = req.body;
-  const alerta = db.get('SELECT * FROM alertas WHERE id=?', [req.params.id]);
-  if (!alerta) return res.status(404).json({ error: 'Alerta no encontrada' });
-  if (alerta.estado === 'resuelta') return res.status(400).json({ error: 'Alerta ya resuelta' });
-  db.run(
-    `UPDATE alertas SET estado='reconocida', nota=?, reconocida_por=?, reconocida_en=datetime('now') WHERE id=?`,
-    [nota || null, req.user.email, req.params.id]
-  );
-  res.json({ ok: true });
-});
-
 // ─── POST /api/iae/generar-alertas (llamado también desde admin tras carga CSV) ─
 
 router.post('/generar-alertas', authMiddleware, (req, res) => {
   try {
-    res.json(generarAlertas());
+    res.json(generarAlertas(req.log));
   } catch (e) {
-    logger.error('Error generando alertas IAE', e);
+    req.log.error('Error generando alertas IAE', e);
     res.status(500).json({ error: e.message });
   }
 });
 
 // ─── FUNCIÓN INTERNA exportada para ser llamada desde admin.js ────────────────
 
-function generarAlertas() {
+function generarAlertas(log) {
+  log = log || logger;
   const rows = getIniRows();
   const iniMap = {};
   for (const r of rows) {
@@ -166,9 +153,11 @@ function generarAlertas() {
 
   // Tipo 1: Horas placeholder (≥ 100h) agrupadas por iniciativa
   const phByIni = {};
-  for (const t of db.all('SELECT id_task, id_iniciativa, nombre_iniciativa, horas_estimadas FROM tasks_seguimiento WHERE horas_estimadas >= 100')) {
+  for (const t of db.all(`
+    SELECT id_task, nombre_task, id_iniciativa, nombre_iniciativa, horas_estimadas, horas_completadas
+    FROM tasks_seguimiento WHERE horas_estimadas >= 100`)) {
     if (!phByIni[t.id_iniciativa]) phByIni[t.id_iniciativa] = { nombre: t.nombre_iniciativa, tasks: [] };
-    phByIni[t.id_iniciativa].tasks.push(t.id_task);
+    phByIni[t.id_iniciativa].tasks.push(t);
   }
   for (const [id, data] of Object.entries(phByIni)) {
     const ini = iniMap[id];
@@ -177,15 +166,18 @@ function generarAlertas() {
       tipo: 'HORAS_PLACEHOLDER', severidad: 'advertencia',
       id_iniciativa: id, nombre_ini: data.nombre,
       iae: ini.iae, pct_tareas: ini.pct_tareas, pct_horas: ini.pct_horas,
-      tasks_json: JSON.stringify(data.tasks)
+      tasks_json: JSON.stringify(data.tasks.map(t => t.id_task)),
+      tasks_detalle: data.tasks
     });
   }
 
   // Tipo 2: Estimación cero con horas ejecutadas
   const zeroByIni = {};
-  for (const t of db.all('SELECT id_task, id_iniciativa, nombre_iniciativa FROM tasks_seguimiento WHERE horas_estimadas = 0 AND horas_completadas > 0')) {
+  for (const t of db.all(`
+    SELECT id_task, nombre_task, id_iniciativa, nombre_iniciativa, horas_completadas
+    FROM tasks_seguimiento WHERE horas_estimadas = 0 AND horas_completadas > 0`)) {
     if (!zeroByIni[t.id_iniciativa]) zeroByIni[t.id_iniciativa] = { nombre: t.nombre_iniciativa, tasks: [] };
-    zeroByIni[t.id_iniciativa].tasks.push(t.id_task);
+    zeroByIni[t.id_iniciativa].tasks.push(t);
   }
   for (const [id, data] of Object.entries(zeroByIni)) {
     const ini = iniMap[id];
@@ -194,7 +186,8 @@ function generarAlertas() {
       tipo: 'ZERO_ESTIMATE', severidad: 'info',
       id_iniciativa: id, nombre_ini: data.nombre,
       iae: ini?.iae, pct_tareas: ini?.pct_tareas, pct_horas: ini?.pct_horas,
-      tasks_json: JSON.stringify(data.tasks)
+      tasks_json: JSON.stringify(data.tasks.map(t => t.id_task)),
+      tasks_detalle: data.tasks
     });
   }
 
@@ -204,11 +197,12 @@ function generarAlertas() {
     const ph = criticalIds.map(() => '?').join(',');
     const openByIni = {};
     for (const t of db.all(
-      `SELECT id_task, id_iniciativa, nombre_iniciativa FROM tasks_seguimiento WHERE id_iniciativa IN (${ph}) AND estado != 'Closed'`,
+      `SELECT id_task, nombre_task, id_iniciativa, nombre_iniciativa, estado
+       FROM tasks_seguimiento WHERE id_iniciativa IN (${ph}) AND estado != 'Closed'`,
       criticalIds
     )) {
       if (!openByIni[t.id_iniciativa]) openByIni[t.id_iniciativa] = { nombre: t.nombre_iniciativa, tasks: [] };
-      openByIni[t.id_iniciativa].tasks.push(t.id_task);
+      openByIni[t.id_iniciativa].tasks.push(t);
     }
     for (const [id, data] of Object.entries(openByIni)) {
       const ini = iniMap[id];
@@ -216,13 +210,14 @@ function generarAlertas() {
         tipo: 'TASKS_ABIERTAS_CRITICO', severidad: 'critica',
         id_iniciativa: id, nombre_ini: data.nombre,
         iae: ini?.iae, pct_tareas: ini?.pct_tareas, pct_horas: ini?.pct_horas,
-        tasks_json: JSON.stringify(data.tasks)
+        tasks_json: JSON.stringify(data.tasks.map(t => t.id_task)),
+        tasks_detalle: data.tasks
       });
     }
   }
 
-  // Actualizar tabla alertas
-  const existentes = db.all("SELECT * FROM alertas WHERE estado IN ('nueva','activa','reconocida')");
+  // Actualizar tabla alertas — solo estados activos (reconocida ya no existe)
+  const existentes = db.all("SELECT * FROM alertas WHERE estado NOT IN ('resuelta')");
   const nuevasKeys = new Set(nuevasAnomalias.map(a => `${a.tipo}::${a.id_iniciativa}`));
   const existentesMap = {};
   for (const e of existentes) existentesMap[`${e.tipo}::${e.id_iniciativa}`] = e;
@@ -235,8 +230,11 @@ function generarAlertas() {
   }
 
   let nuevas = 0;
+  const nuevasDetalle = []; // solo alertas recién insertadas
+  const todasDetalle  = []; // todas las activas (para el email tras carga)
   for (const a of nuevasAnomalias) {
     const key = `${a.tipo}::${a.id_iniciativa}`;
+    const detalle = { tipo: a.tipo, severidad: a.severidad, nombre_ini: a.nombre_ini, iae: a.iae, tasks: a.tasks_detalle };
     if (!existentesMap[key]) {
       db.run(
         `INSERT INTO alertas (tipo,severidad,id_iniciativa,nombre_ini,iae,pct_tareas,pct_horas,tasks_json,estado)
@@ -244,17 +242,20 @@ function generarAlertas() {
         [a.tipo, a.severidad, a.id_iniciativa, a.nombre_ini, a.iae, a.pct_tareas, a.pct_horas, a.tasks_json]
       );
       nuevas++;
+      nuevasDetalle.push(detalle);
     } else {
-      // Actualizar datos frescos
+      // Actualizar datos frescos de alerta existente
       db.run(
         `UPDATE alertas SET iae=?, pct_tareas=?, pct_horas=?, tasks_json=?, severidad=? WHERE id=?`,
         [a.iae, a.pct_tareas, a.pct_horas, a.tasks_json, a.severidad, existentesMap[key].id]
       );
     }
+    todasDetalle.push(detalle);
   }
 
-  logger.info(`IAE alertas: ${nuevas} nuevas · ${nuevasAnomalias.length} activas · ${existentes.length - nuevasKeys.size + nuevas} resueltas`);
-  return { ok: true, nuevas, total: nuevasAnomalias.length };
+  const resueltas = existentes.filter(e => !nuevasKeys.has(`${e.tipo}::${e.id_iniciativa}`)).length;
+  log.info(`IAE alertas: ${nuevas} nuevas · ${nuevasAnomalias.length} activas · ${resueltas} resueltas`);
+  return { ok: true, nuevas, total: nuevasAnomalias.length, nuevasDetalle, todasDetalle };
 }
 
 module.exports = { router, generarAlertas };

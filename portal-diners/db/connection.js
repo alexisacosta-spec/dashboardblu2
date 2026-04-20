@@ -223,6 +223,25 @@ db.run(`CREATE TABLE IF NOT EXISTS alertas (
 )`);
 // Índice para consultas frecuentes
 db.run(`CREATE INDEX IF NOT EXISTS idx_alertas_estado ON alertas(estado)`);
+// Migración: "reconocida" se elimina — vuelven a "nueva" para ser visibles y auto-resolverse
+try { db.run(`UPDATE alertas SET estado='nueva' WHERE estado='reconocida'`); } catch(_) {}
+
+// ─── LOGS DE CLIENTE (browser) ───────────────────────────────────────────────
+db.run(`CREATE TABLE IF NOT EXISTS client_logs (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  fecha      TEXT    DEFAULT (datetime('now')),
+  sesion_id  TEXT    NOT NULL,
+  email      TEXT,
+  perfil     TEXT,
+  evento     TEXT    NOT NULL,
+  datos      TEXT,
+  ip         TEXT,
+  user_agent TEXT
+)`);
+db.run(`CREATE INDEX IF NOT EXISTS idx_cl_email ON client_logs(email)`);
+db.run(`CREATE INDEX IF NOT EXISTS idx_cl_fecha ON client_logs(fecha)`);
+// Auto-limpiar logs de cliente más antiguos de 30 días
+db.run(`DELETE FROM client_logs WHERE fecha < datetime('now','-30 days')`);
 
 // ─── ADMIN INICIAL DESDE VARIABLES DE ENTORNO ─────────────────────────────────
 const ADMIN_EMAIL    = process.env.ADMIN_EMAIL;

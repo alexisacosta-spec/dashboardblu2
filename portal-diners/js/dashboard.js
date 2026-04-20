@@ -133,6 +133,12 @@ function applyFilters() {
   _updateFilterUI();
   const v = document.querySelector('.view.active')?.id?.replace('view-','');
   if (v) renderView(v);
+  if (typeof clientLog !== 'undefined') {
+    const filtros = {};
+    [['f-anio','anio'],['f-mes','mes'],['f-empresa','empresa'],['f-cat','cat'],['f-ini','ini']]
+      .forEach(([id, key]) => { const val = document.getElementById(id)?.value; if (val) filtros[key] = val; });
+    if (Object.keys(filtros).length) clientLog('FILTER_APPLIED', filtros);
+  }
 }
 
 // ─── VIEWS ────────────────────────────────────────────────────────────────────
@@ -253,4 +259,5 @@ window.showView = function(name) {
     if (vistas.has(name)) { openNavGrp(grpId); break; }
   }
   if (window.innerWidth <= 900) closeSidebar();
+  if (typeof clientLog !== 'undefined') clientLog('VIEW', { vista: name });
 };

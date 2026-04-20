@@ -1218,10 +1218,95 @@
   </div>
 </div>
 
+<!-- MODAL METODOLOGÍA IAE -->
+<div class="modal-overlay" id="modal-iae-metodologia">
+  <div class="modal" style="max-width:700px;width:96vw">
+    <div class="modal-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div class="modal-title">Metodología · IAE</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:3px">Índice de Avance Efectivo — cómo se calcula e interpreta</div>
+      </div>
+      <button onclick="closeModal('modal-iae-metodologia')" style="background:rgba(255,255,255,.12);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;line-height:1;flex-shrink:0">✕</button>
+    </div>
+    <div class="modal-body" style="padding:1.5rem">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px">
+
+        <!-- Fórmula -->
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px">Fórmula</div>
+          <div style="font-family:monospace;font-size:11.5px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:11px 13px;line-height:1.9;margin-bottom:12px">
+            %Tareas = Cerradas / Total × 100<br>
+            %Horas = H.Ejec. / H.Est. × 100<br>
+            Ef. = min(1, %Tareas / %Horas)<br>
+            <strong style="color:var(--blue-el)">IAE = %Tareas × Eficiencia</strong>
+          </div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.75">
+            <strong style="color:var(--text)">Sin sobreejecución</strong> → Eficiencia = 1 → IAE = %Tareas, sin penalización.<br><br>
+            <strong style="color:var(--text)">Con sobreejecución</strong> → IAE se reduce proporcionalmente a cuánto superan las horas ejecutadas.
+          </div>
+        </div>
+
+        <!-- Semáforo -->
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px">Semáforo</div>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <span style="width:14px;height:14px;border-radius:50%;background:#16A34A;flex-shrink:0;margin-top:2px;box-shadow:0 0 0 3px #DCFCE7"></span>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:#166534">En Control</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:1px">IAE ≥ 85% · avance y horas alineados</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <span style="width:14px;height:14px;border-radius:50%;background:#D97706;flex-shrink:0;margin-top:2px;box-shadow:0 0 0 3px #FEF3C7"></span>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:#92400E">Advertencia</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:1px">IAE 70–84% · desvío moderado</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:flex-start">
+              <span style="width:14px;height:14px;border-radius:50%;background:#DC2626;flex-shrink:0;margin-top:2px;box-shadow:0 0 0 3px #FEE2E2"></span>
+              <div>
+                <div style="font-weight:700;font-size:13px;color:#991B1B">Crítico</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:1px">IAE &lt; 70% · intervención necesaria</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Anomalías -->
+        <div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:10px">Anomalías de calidad</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:6px;padding:10px 12px">
+              <div style="font-size:12px;font-weight:700;color:#991B1B;margin-bottom:3px">🔴 Tasks abiertas en críticos</div>
+              <div style="font-size:11px;color:#7F1D1D;line-height:1.5">Cerrarlas en ADO mejora el IAE directamente.</div>
+            </div>
+            <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:6px;padding:10px 12px">
+              <div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:3px">🟠 Horas placeholder ≥ 100h</div>
+              <div style="font-size:11px;color:#78350F;line-height:1.5">Distorsionan %Horas e IAE global.</div>
+            </div>
+            <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:10px 12px">
+              <div style="font-size:12px;font-weight:700;color:#1E40AF;margin-bottom:3px">ℹ️ Sin estimación con horas ejecutadas</div>
+              <div style="font-size:11px;color:#1E3A8A;line-height:1.5">Imposibilitan el cálculo correcto.</div>
+            </div>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--muted)">Corrige usando el #ID mostrado en ADO y recarga el CSV.</div>
+        </div>
+
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn-sec" onclick="closeModal('modal-iae-metodologia')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- UX-16: Gantt tooltip flotante -->
 <div class="gantt-tip" id="gantt-tip"></div>
 
 <script src="js/config.js"></script>
+<script src="js/client-log.js"></script>
 <script src="js/api.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/exports.js"></script>

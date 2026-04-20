@@ -149,6 +149,7 @@ function handleDrop(e) {
 }
 
 async function uploadCSV(file) {
+  clientLog('CSV_UPLOAD_INICIADO', { archivo: file.name, kb: Math.round(file.size / 1024) });
   const status = document.getElementById('upload-status');
   status.style.display = '';
   status.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:12px">⏳ Procesando CSV… esto puede tomar unos segundos</div>';
@@ -184,9 +185,11 @@ async function uploadCSV(file) {
 
     status.innerHTML = html;
     const sinLookupN = data.sin_lookup?.length || 0;
+    clientLog('CSV_UPLOAD_OK', { archivo: file.name, tasks: data.tasks_con_horas, iniciativas: data.iniciativas, sin_lookup: sinLookupN });
     toast(`✓ ${fmtN(data.tasks_con_horas)} tasks · ${data.iniciativas || 0} iniciativas${sinLookupN ? ` · ⚠ ${sinLookupN} sin lookup` : ''}`, sinLookupN ? 'warn' : 'ok');
     await loadFiltros();
   } catch(e) {
+    clientLog('CSV_UPLOAD_ERROR', { archivo: file.name, error: e.message });
     status.innerHTML = `<div style="font-size:13px;color:var(--error);padding:12px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px">
       ❌ <strong>Error al procesar el CSV</strong><br>
       <span style="font-size:12px;margin-top:4px;display:block">${e.message}</span>
@@ -277,6 +280,7 @@ async function restaurarCSV(id, nombre, fecha) {
   if (!confirm(`¿Restaurar los datos de "${nombre}" (${new Date(fecha).toLocaleString('es-EC')})?\n\nEsto reemplazará los datos actuales del dashboard.`)) return;
   try {
     const r = await api('/api/admin/historial-csv/' + id + '/restaurar', 'POST');
+    clientLog('SNAPSHOT_RESTAURADO', { archivo: nombre, id, tasks: r.tasks, iniciativas: r.iniciativas });
     toast(`Restaurado: ${fmtN(r.tasks)} tasks · ${fmtN(r.iniciativas)} iniciativas`, 'ok');
     await loadFiltros();
     loadHistorialCSV();

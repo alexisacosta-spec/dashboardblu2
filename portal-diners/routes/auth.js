@@ -9,7 +9,6 @@ const db                 = require('../db/connection');
 const { JWT_SECRET, validatePassword, auditLog, authMiddleware } = require('../middleware/auth');
 const { authLimiter, resendLimiter, forgotLimiter }              = require('../middleware/security');
 const { enviarOTP, enviarResetPassword, enviarInvitacion }       = require('../lib/email');
-const logger             = require('../lib/logger');
 
 const PORT = process.env.PORT || 3000;
 
@@ -23,15 +22,17 @@ router.post('/login', authLimiter, (req, res) => {
   }
   if (!user || user.activo === 0 || !bcrypt.compareSync(password, user.password_hash)) {
     db.run('INSERT INTO sesiones_log (email,evento,ip) VALUES (?,?,?)', [email,'LOGIN_FALLIDO',req.ip]);
-    logger.warn(`Login fallido: ${email} — credenciales incorrectas`);
+    req.log.warn(`Login fallido: ${email} — credenciales incorrectas`);
+    req.log.audit('LOGIN_FALLIDO', { email, razon: 'credenciales_incorrectas' });
     return res.status(401).json({ error: 'Credenciales incorrectas' });
   }
   db.run('DELETE FROM otp_codes WHERE user_id=?', [user.id]);
   const codigo = Math.floor(100000 + Math.random() * 900000).toString();
   const expira = new Date(Date.now() + 5*60*1000).toISOString().replace('T',' ').split('.')[0];
   db.run('INSERT INTO otp_codes (user_id,codigo,expira_en) VALUES (?,?,?)', [user.id, codigo, expira]);
-  enviarOTP(user.email, user.nombre, codigo).catch(e => logger.error(`OTP email error (${email})`, e));
-  logger.info(`OTP enviado → ${user.email} (${user.perfil})`);
+  enviarOTP(user.email, user.nombre, codigo).catch(e => req.log.error(`OTP email error (${email})`, e));
+  req.log.info(`OTP enviado → ${user.email} (${user.perfil})`);
+  req.log.audit('OTP_ENVIADO', { email: user.email, perfil: user.perfil });
   db.run('INSERT INTO sesiones_log (user_id,email,evento,ip) VALUES (?,?,?,?)', [user.id,user.email,'OTP_ENVIADO',req.ip]);
   res.json({ ok: true });
 });
@@ -53,7 +54,8 @@ router.post('/verify-otp', authLimiter, (req, res) => {
   db.run('UPDATE otp_codes SET usado=1 WHERE id=?', [otp.id]);
   db.run('UPDATE usuarios SET ultimo_acceso=? WHERE id=?', [now, user.id]);
   db.run('INSERT INTO sesiones_log (user_id,email,evento,ip) VALUES (?,?,?,?)', [user.id,user.email,'LOGIN_OK',req.ip]);
-  logger.info(`Login exitoso: ${user.email} (${user.perfil})`);
+  req.log.info(`Login exitoso: ${user.email} (${user.perfil})`);
+  req.log.audit('LOGIN_OK', { email: user.email, perfil: user.perfil });
   const jti   = crypto.randomBytes(16).toString('hex');
   const token = jwt.sign({ id:user.id, email:user.email, nombre:user.nombre, perfil:user.perfil, jti }, JWT_SECRET, { expiresIn:'8h' });
   res.json({ ok:true, token, user:{ nombre:user.nombre, email:user.email, perfil:user.perfil } });
@@ -82,7 +84,7 @@ router.post('/resend-otp', resendLimiter, (req, res) => {
   const codigo = Math.floor(100000 + Math.random() * 900000).toString();
   const expira = new Date(Date.now() + 5*60*1000).toISOString().replace('T',' ').split('.')[0];
   db.run('INSERT INTO otp_codes (user_id,codigo,expira_en) VALUES (?,?,?)', [user.id, codigo, expira]);
-  enviarOTP(user.email, user.nombre, codigo).catch(e => logger.error(`Resend OTP error (${user.email})`, e));
+  enviarOTP(user.email, user.nombre, codigo).catch(e => req.log.error(`Resend OTP error (${user.email})`, e));
   res.json({ ok: true });
 });
 
@@ -97,11 +99,12 @@ router.post('/forgot-password', forgotLimiter, (req, res) => {
       const codigo = Math.floor(100000 + Math.random() * 900000).toString();
       const expira = new Date(Date.now() + 5*60*1000).toISOString().replace('T',' ').split('.')[0];
       db.run('INSERT INTO password_reset_codes (user_id,codigo,expira_en) VALUES (?,?,?)', [user.id, codigo, expira]);
-      enviarResetPassword(user.email, user.nombre, codigo).catch(e => logger.error(`Reset email error (${email})`, e));
-      logger.info(`Reset password solicitado: ${email}`);
+      enviarResetPassword(user.email, user.nombre, codigo).catch(e => req.log.error(`Reset email error (${email})`, e));
+      req.log.info(`Reset password solicitado: ${email}`);
+      req.log.audit('PASSWORD_RESET_SOLICITADO', { email });
       auditLog(email, 'PASSWORD_RESET_SOLICITADO', null, req.ip);
     }
-  } catch(e) { logger.error('forgot-password error', e); }
+  } catch(e) { req.log.error('forgot-password error', e); }
   res.json({ ok: true }); // Siempre responde igual — no revelar si el email existe
 });
 
@@ -129,7 +132,8 @@ router.post('/reset-password', forgotLimiter, (req, res) => {
   }
   db.run('UPDATE usuarios SET password_hash=? WHERE id=?', [bcrypt.hashSync(nueva_password, 10), user.id]);
   db.run('UPDATE password_reset_codes SET usado=1 WHERE id=?', [reset.id]);
-  logger.info(`Contraseña reseteada: ${email}`);
+  req.log.info(`Contraseña reseteada: ${email}`);
+  req.log.audit('PASSWORD_RESET_OK', { email });
   auditLog(email, 'PASSWORD_RESET_OK', null, req.ip);
   res.json({ ok: true });
 });
@@ -167,7 +171,8 @@ router.post('/invitacion/activar', authLimiter, (req, res) => {
   const user = db.get('SELECT id,nombre,email,perfil FROM usuarios WHERE id=?', [inv.user_id]);
   db.run('INSERT INTO sesiones_log (user_id,email,evento,ip) VALUES (?,?,?,?)',
     [user.id, user.email, 'CUENTA_ACTIVADA', req.ip]);
-  logger.info(`Cuenta activada: ${user.email} (${user.perfil})`);
+  req.log.info(`Cuenta activada: ${user.email} (${user.perfil})`);
+  req.log.audit('CUENTA_ACTIVADA', { email: user.email, perfil: user.perfil });
   auditLog(user.email, 'CUENTA_ACTIVADA', null, req.ip);
 
   const jti      = crypto.randomBytes(16).toString('hex');
